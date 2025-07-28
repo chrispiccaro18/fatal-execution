@@ -20,8 +20,45 @@ function GameState.init()
     threat = Threat.init(),
     log = {},
     currentSystemIndex = 1,
-    envEffect = "No special effect."
+    envEffect = "No special effect.",
+    uiTransitions = {},
   }
+end
+
+-- UI Transitions
+function GameState.enqueueTransition(state, type, payload)
+  local newState = GameState.shallowCopy(state)
+  table.insert(newState.uiTransitions, {
+    type = type,
+    payload = payload
+  })
+  return newState
+end
+
+function GameState.applyTransition(state, transition)
+  local newState = GameState.shallowCopy(state)
+
+  if transition.type == "draw" then
+    local card = transition.payload.card
+    card.selectable = true
+    card.state = "idle"
+    table.insert(newState.hand, card)
+    -- local newHand = Hand.drawCard(state.hand, card, state.handSize)
+    -- newState.hand = newHand
+  elseif transition.type == "discard" then
+    local card = transition.payload.card
+    local index = transition.payload.handIndex
+
+    local newHand = Hand.removeCardAt(state.hand, index)
+    local newDestructorQueue = DestructorQueue.enqueue(state.destructorQueue, card)
+    card.state = "idle"
+
+    newState.hand = newHand
+    newState.destructorQueue = newDestructorQueue
+    newState.ram = state.ram + transition.payload.amount
+  end
+
+  return newState
 end
 
 function GameState.updateCurrentSystemIndex(state)
@@ -35,7 +72,10 @@ function GameState.updateCurrentSystemIndex(state)
   if currentSystem.progress >= currentSystem.required then
     if newState.currentSystemIndex < #newState.systems then
       newState.currentSystemIndex = newState.currentSystemIndex + 1
-      newState = GameState.addLog(newState, "System " .. currentSystem.name .. " completed. Moving to " .. newState.systems[newState.currentSystemIndex].name .. ".")
+      newState = GameState.addLog(newState,
+                                  "System " ..
+                                  currentSystem.name ..
+                                  " completed. Moving to " .. newState.systems[newState.currentSystemIndex].name .. ".")
 
       local newEnvEffect = currentSystem.envEffect
       newState.envEffect = newEnvEffect
@@ -48,18 +88,18 @@ function GameState.updateCurrentSystemIndex(state)
 
   if currentSystem.progress < 0 then
     newState.systems[newState.currentSystemIndex].progress = 0
-  --   if newState.currentSystemIndex == 1 then
-  --     return newState
-  --   end
+    --   if newState.currentSystemIndex == 1 then
+    --     return newState
+    --   end
 
-  --   newState.currentSystemIndex = newState.currentSystemIndex - 1
-  --   local prevSystem = newState.systems[newState.currentSystemIndex]
-  --   prevSystem.progress = prevSystem.required + currentSystem.progress
-  --   if prevSystem.progress < 0 then
-  --     prevSystem.progress = 0 -- prevent double system reversions
-  --   end
-  --   newState.systems[newState.currentSystemIndex] = prevSystem
-  --   newState = GameState.addLog(newState, "Reverted to previous system: " .. prevSystem.name)
+    --   newState.currentSystemIndex = newState.currentSystemIndex - 1
+    --   local prevSystem = newState.systems[newState.currentSystemIndex]
+    --   prevSystem.progress = prevSystem.required + currentSystem.progress
+    --   if prevSystem.progress < 0 then
+    --     prevSystem.progress = 0 -- prevent double system reversions
+    --   end
+    --   newState.systems[newState.currentSystemIndex] = prevSystem
+    --   newState = GameState.addLog(newState, "Reverted to previous system: " .. prevSystem.name)
   end
 
   return newState
@@ -75,9 +115,19 @@ function GameState.beginTurn(state)
   newState.turn.turnCount = newState.turn.turnCount + 1
   newState = GameState.addLog(newState, "-- Turn " .. newState.turn.turnCount .. " begins --")
 
-  while #newState.hand < newState.handSize and #newState.deck > 0 do
-    newState = GameState.drawCard(newState)
+  -- calculate how many cards to draw based on hand size
+  local numCardsToDraw = newState.handSize - #newState.hand
+  if numCardsToDraw < 0 then
+    numCardsToDraw = 0 -- don't draw if we already have enough cards
   end
+
+  for i = 1, numCardsToDraw do
+    local virtualIndex = #newState.hand + i
+    newState = GameState.drawCard(newState, virtualIndex)
+  end
+  -- while #newState.hand < newState.handSize and #newState.deck > 0 do
+  --   newState = GameState.drawCard(newState)
+  -- end
 
   return newState
 end
@@ -130,37 +180,58 @@ function GameState.checkLossCondition(state)
   return state
 end
 
-function GameState.drawCard(state)
+function GameState.drawCard(state, intendedIndex)
   local newState = GameState.shallowCopy(state)
   local card, newDeck = Deck.draw(state.deck)
-  local newHand = Hand.drawCard(state.hand, card, state.handSize)
+
+  if not card then
+    newState = GameState.addLog(newState, "Deck is empty, cannot draw a card.")
+    return newState
+  end
 
   newState.deck = newDeck
-  newState.hand = newHand
+
+  -- card.justDrawn = true -- mark the card as just drawn for UI purposes
+  -- table.insert(require("renderer").pendingDraws, { card = card, index = intendedIndex })
+  newState = GameState.enqueueTransition(newState, "draw", {
+    card = card,
+    index = intendedIndex
+  })
+
+  -- local newHand = Hand.drawCard(state.hand, card, state.handSize)
+  -- newState.hand = newHand
 
   newState = GameState.addLog(newState, "Drew card: " .. card.name)
   return newState
 end
 
 function GameState.discardCardForRam(state, index)
+  print("Discarding card at index:", index)
   local newState = GameState.shallowCopy(state)
   local card = state.hand[index]
 
-  newState.ram = newState.ram + card.cost
-  newState.hand = Hand.removeCardAt(state.hand, index)
-  newState.destructorQueue = DestructorQueue.enqueue(state.destructorQueue, card)
+  -- newState.ram = newState.ram + card.cost
+  -- newState.hand = Hand.removeCardAt(state.hand, index)
+  -- newState.destructorQueue = DestructorQueue.enqueue(state.destructorQueue, card)
+
+  GameState.enqueueTransition(state, "discard", {
+    card = card,
+    handIndex = index,
+    amount = card.cost
+  })
 
   newState = GameState.addLog(newState, "Discarded " .. card.name .. " for " .. card.cost .. " RAM.")
   return newState
 end
 
 function GameState.playCard(state, index)
+  print("Playing card at index:", index)
   local card = state.hand[index]
   if state.ram < card.cost then
     return state -- not enough RAM, do nothing
   end
 
-  
+
   local newState = GameState.shallowCopy(state)
 
   newState = GameState.addLog(newState, "Played card: " .. card.name)

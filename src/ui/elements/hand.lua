@@ -56,8 +56,9 @@ function HandUI.drawHand(panelRect)
               cardR.w - pad*2,
               "center")
 
-    -- maybe card name or id instead of just "card"?
-    Click.register("card", cardR, {handIndex = i}) -- register click area for the card
+    if card.selectable then
+      Click.register("card", cardR, { handIndex = i })
+    end
   end
 end
 

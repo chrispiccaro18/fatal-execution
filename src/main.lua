@@ -5,6 +5,7 @@ local Click = require("ui.click")
 local Renderer = require("renderer")
 local Menu = require("ui.menu")
 local EndGameUI = require("ui.elements.end_game")
+local Animation = require("ui.animate")
 
 package.path = package.path
     .. ";src/?.lua"
@@ -25,12 +26,17 @@ function love.load()
   love.gameState = state
 end
 
+function love.update(dt)
+  Animation.update(dt)
+end
+
 function love.draw()
   -- local boardImage = love.graphics.newImage("assets/ui-sketch-no-resize.png")
   -- love.graphics.draw(boardImage, 0, 0, 0, Const.SCALE, Const.SCALE)
   love.graphics.setCanvas(Display.canvas)
   love.graphics.clear(0.07, 0.07, 0.07) -- Dark gray background
   Renderer.drawUI()
+  Animation.draw()
   love.graphics.setCanvas()             -- Reset to the main canvas
 
   love.graphics.push()

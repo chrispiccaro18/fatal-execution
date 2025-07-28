@@ -1,4 +1,20 @@
-local starterCards = {
+local function newCard(props)
+  return {
+    name = props.name or "Unnamed Card",
+    cost = props.cost or 0,
+    playEffect = props.playEffect or { type = "none", amount = 0 },
+    destructorEffect = props.destructorEffect or { type = "none", amount = 0 },
+
+    -- UI-related transient fields
+    state = "idle",        -- "idle", "animating", etc.
+    pos = nil,             -- {x=, y=} screen coords if needed
+    animX = nil,
+    animY = nil,
+    selectable = false     -- can it be clicked yet?
+  }
+end
+
+local rawStarterCards = {
   {
     name = "Guru Meditation",
     cost = 1,
@@ -60,5 +76,15 @@ local starterCards = {
     destructorEffect = { type = "threat", amount = 4 }
   },
 }
+
+local function createStarterCards()
+  local cards = {}
+  for _, cardProps in ipairs(rawStarterCards) do
+    table.insert(cards, newCard(cardProps))
+  end
+  return cards
+end
+
+local starterCards = createStarterCards()
 
 return starterCards
