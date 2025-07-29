@@ -48,14 +48,43 @@ function GameState.applyTransition(state, transition)
   elseif transition.type == "discard" then
     local card = transition.payload.card
     local index = transition.payload.handIndex
+    card.state = "idle"
 
     local newHand = Hand.removeCardAt(state.hand, index)
     local newDestructorQueue = DestructorQueue.enqueue(state.destructorQueue, card)
-    card.state = "idle"
 
     newState.hand = newHand
     newState.destructorQueue = newDestructorQueue
     newState.ram = state.ram + transition.payload.amount
+  elseif transition.type == "play" then
+    local card = transition.payload.card
+    local index = transition.payload.handIndex
+    card.state = "idle"
+
+    local newHand = Hand.removeCardAt(state.hand, index)
+    local newDeck = Deck.placeOnBottom(state.deck, card)
+    newState.hand = newHand
+    newState.deck = newDeck
+    -- newState.ram = state.ram - card.cost
+    -- newState = GameState.addLog(newState, "Played card: " .. card.name)
+
+    if card.playEffect and card.playEffect.type == "progress" then
+      newState.systems = Systems.incrementProgress(
+        state.systems,
+        state.currentSystemIndex,
+        card.playEffect.amount
+      )
+      newState = GameState.updateCurrentSystemIndex(newState)
+    end
+
+    if card.playEffect and card.playEffect.type == "threat" then
+      newState.threat = Threat.increment(state.threat, card.playEffect.amount)
+    end
+
+    if GameState.checkWinCondition(newState) then
+      newState.turn.phase = "won"
+      newState = GameState.addLog(newState, "== ALL SYSTEMS RESTORED ==")
+    end
   end
 
   return newState
@@ -88,18 +117,6 @@ function GameState.updateCurrentSystemIndex(state)
 
   if currentSystem.progress < 0 then
     newState.systems[newState.currentSystemIndex].progress = 0
-    --   if newState.currentSystemIndex == 1 then
-    --     return newState
-    --   end
-
-    --   newState.currentSystemIndex = newState.currentSystemIndex - 1
-    --   local prevSystem = newState.systems[newState.currentSystemIndex]
-    --   prevSystem.progress = prevSystem.required + currentSystem.progress
-    --   if prevSystem.progress < 0 then
-    --     prevSystem.progress = 0 -- prevent double system reversions
-    --   end
-    --   newState.systems[newState.currentSystemIndex] = prevSystem
-    --   newState = GameState.addLog(newState, "Reverted to previous system: " .. prevSystem.name)
   end
 
   return newState
@@ -118,16 +135,13 @@ function GameState.beginTurn(state)
   -- calculate how many cards to draw based on hand size
   local numCardsToDraw = newState.handSize - #newState.hand
   if numCardsToDraw < 0 then
-    numCardsToDraw = 0 -- don't draw if we already have enough cards
+    numCardsToDraw = 0
   end
 
   for i = 1, numCardsToDraw do
     local virtualIndex = #newState.hand + i
     newState = GameState.drawCard(newState, virtualIndex)
   end
-  -- while #newState.hand < newState.handSize and #newState.deck > 0 do
-  --   newState = GameState.drawCard(newState)
-  -- end
 
   return newState
 end
@@ -191,28 +205,18 @@ function GameState.drawCard(state, intendedIndex)
 
   newState.deck = newDeck
 
-  -- card.justDrawn = true -- mark the card as just drawn for UI purposes
-  -- table.insert(require("renderer").pendingDraws, { card = card, index = intendedIndex })
   newState = GameState.enqueueTransition(newState, "draw", {
     card = card,
     index = intendedIndex
   })
-
-  -- local newHand = Hand.drawCard(state.hand, card, state.handSize)
-  -- newState.hand = newHand
 
   newState = GameState.addLog(newState, "Drew card: " .. card.name)
   return newState
 end
 
 function GameState.discardCardForRam(state, index)
-  print("Discarding card at index:", index)
   local newState = GameState.shallowCopy(state)
   local card = state.hand[index]
-
-  -- newState.ram = newState.ram + card.cost
-  -- newState.hand = Hand.removeCardAt(state.hand, index)
-  -- newState.destructorQueue = DestructorQueue.enqueue(state.destructorQueue, card)
 
   GameState.enqueueTransition(state, "discard", {
     card = card,
@@ -225,40 +229,44 @@ function GameState.discardCardForRam(state, index)
 end
 
 function GameState.playCard(state, index)
-  print("Playing card at index:", index)
-  local card = state.hand[index]
-  if state.ram < card.cost then
-    return state -- not enough RAM, do nothing
-  end
-
-
   local newState = GameState.shallowCopy(state)
+  local card = state.hand[index]
+
+  if state.ram < card.cost then
+    newState = GameState.addLog(newState, "Not enough RAM to play " .. card.name .. ".")
+    return newState
+  end
 
   newState = GameState.addLog(newState, "Played card: " .. card.name)
   newState.ram = newState.ram - card.cost
-  newState.hand = Hand.removeCardAt(state.hand, index)
 
-  if card.playEffect and card.playEffect.type == "progress" then
-    newState.systems = Systems.incrementProgress(
-      state.systems,
-      state.currentSystemIndex,
-      card.playEffect.amount
-    )
-    newState = GameState.updateCurrentSystemIndex(newState)
-  end
+  newState = GameState.enqueueTransition(newState, "play", {
+    card = card,
+    handIndex = index
+  })
+  -- newState.hand = Hand.removeCardAt(state.hand, index)
 
-  if card.playEffect and card.playEffect.type == "threat" then
-    local amount = card.playEffect.amount
-    newState.threat = Threat.increment(state.threat, amount)
-  end
+  -- if card.playEffect and card.playEffect.type == "progress" then
+  --   newState.systems = Systems.incrementProgress(
+  --     state.systems,
+  --     state.currentSystemIndex,
+  --     card.playEffect.amount
+  --   )
+  --   newState = GameState.updateCurrentSystemIndex(newState)
+  -- end
 
-  newState.deck = Deck.placeOnBottom(newState.deck, card)
+  -- if card.playEffect and card.playEffect.type == "threat" then
+  --   local amount = card.playEffect.amount
+  --   newState.threat = Threat.increment(state.threat, amount)
+  -- end
 
-  -- Check win condition after playing
-  if GameState.checkWinCondition(newState) then
-    newState.turn.phase = "won"
-    newState = GameState.addLog(newState, "== ALL SYSTEMS RESTORED ==")
-  end
+  -- newState.deck = Deck.placeOnBottom(newState.deck, card)
+
+  -- -- Check win condition after playing
+  -- if GameState.checkWinCondition(newState) then
+  --   newState.turn.phase = "won"
+  --   newState = GameState.addLog(newState, "== ALL SYSTEMS RESTORED ==")
+  -- end
 
   return newState
 end

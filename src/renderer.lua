@@ -1,7 +1,6 @@
 local lg                 = love.graphics
 local cfg                = require("ui.cfg")
 local GameState          = require("game_state.index")
-local Animation          = require("ui.animate")
 local TransitionHandlers = require("ui.transitions.handler")
 local Display            = require("ui.display")
 local SystemsUI          = require("ui.elements.systems")
@@ -58,7 +57,7 @@ local function relayout(w, h)
   local leftW   = math.floor(w * cfg.leftColW - g)
   local rightW  = w - leftW - g
 
-  -- ----- LEFT STACK --------------------------------------------------------
+  -- LEFT STACK
   local leftX   = 0
   local cursorY = 0
 
@@ -69,18 +68,24 @@ local function relayout(w, h)
     return r
   end
 
-  sections.systems = nextRow(cfg.systemsH)
-  sections.effects = nextRow(cfg.effectsH)
-  sections.play    = nextRow(cfg.playH)
-  sections.deck    = nextRow(cfg.deckH)
+  sections.first   = nextRow(cfg.systemsH)
+  sections.second  = nextRow(cfg.effectsH)
+  sections.third   = nextRow(cfg.playH)
+  sections.fourth  = nextRow(cfg.deckH)
 
-  -- ----- RIGHT COLUMN ------------------------------------------------------
-  sections.right   = rect(leftW + g, 0, rightW, h) -- single tall red rect
-end
+  sections.systems = sections.first
+  sections.effects = sliceH(sections.second, "left", 0.5)
+  sections.logs    = sliceH(sections.second, "right", 0.5)
+  sections.play    = sections.third
+  sections.deck    = sliceH(sections.fourth, "left", 0.33)
+  sections.ram     = sliceH(sections.fourth, "center", 0.33)
 
-local function drawFrame(r, color)
-  lg.setColor(color)
-  lg.rectangle("line", r.x, r.y, r.w, r.h)
+  -- RIGHT COLUMN
+  sections.right   = rect(leftW + g, 0, rightW, h)
+
+  sections.threat = sliceV(sections.right, "top", 0.2)
+  sections.destructor = sliceV(sections.right, "center", 0.5)
+  sections.endTurn = sliceV(sections.right, "bottom", 0.2)
 end
 
 Renderer.transitionInProgress = false
@@ -100,50 +105,6 @@ function Renderer.processTransitionQueue()
       applyTransition = GameState.applyTransition,
       setBusy = function(flag) Renderer.transitionInProgress = flag end
     }
-    -- local card = transition.payload.card
-    -- local index = transition.payload.index
-
-    -- Renderer.transitionInProgress = true
-
-    -- local deckPanel = sections.deck
-    -- local handPanel = sections.play
-    -- local pad = cfg.deckPanel.pad
-
-    -- local spacingX = math.min(cfg.handPanel.maxSpacingX,
-    --                           (handPanel.w - pad * 2 - cfg.handPanel.cardW * index) / math.max(1, index - 1))
-    -- local xOffset = (index - 1) * (cfg.handPanel.cardW + spacingX)
-
-    -- local startX = deckPanel.x + pad
-    -- local startY = deckPanel.y + pad
-    -- local endX = handPanel.x + pad + xOffset
-    -- local endY = handPanel.y + pad
-
-    -- card.animX = startX
-    -- card.animY = startY
-
-    -- Animation.add {
-    --   duration = 0.4,
-    --   onUpdate = function(t)
-    --     local tt = 1 - (1 - t) ^ 2
-    --     card.animX = startX + (endX - startX) * tt
-    --     card.animY = startY + (endY - startY) * tt
-    --   end,
-    --   onComplete = function()
-    --     card.animX = nil
-    --     card.animY = nil
-
-    --     -- Apply the logical result
-    --     love.gameState = GameState.applyTransition(love.gameState, transition)
-
-    --     Renderer.transitionInProgress = false
-    --   end,
-    --   onDraw = function()
-    --     love.graphics.setColor(0.8, 0.8, 0.8)
-    --     love.graphics.rectangle("fill", card.animX, card.animY, cfg.handPanel.cardW, cfg.handPanel.cardH)
-    --     love.graphics.setColor(1, 1, 0)
-    --     love.graphics.rectangle("line", card.animX, card.animY, cfg.handPanel.cardW, cfg.handPanel.cardH)
-    --   end
-    -- }
   elseif transition.type == "discard" then
     TransitionHandlers.handleDiscard {
       transition = transition,
@@ -151,57 +112,23 @@ function Renderer.processTransitionQueue()
       applyTransition = GameState.applyTransition,
       setBusy = function(flag) Renderer.transitionInProgress = flag end
     }
-    -- Renderer.transitionInProgress = true
-
-    -- local card = transition.payload.card
-    -- local handIndex = transition.payload.handIndex
-
-    -- card.state = "discarding"
-    -- card.selectable = false
-
-    -- -- Get hand card position
-    -- local handPanel = sections.play
-    -- local pad = cfg.handPanel.pad
-
-    -- local spacingX = math.min(cfg.handPanel.maxSpacingX,
-    --                           (handPanel.w - pad * 2 - cfg.handPanel.cardW * #love.gameState.hand) /
-    --                           math.max(1, #love.gameState.hand - 1))
-    -- local xOffset = (handIndex - 1) * (cfg.handPanel.cardW + spacingX)
-    -- local startX = handPanel.x + pad + xOffset
-    -- local startY = handPanel.y + pad
-
-    -- -- Get destructor panel center
-    -- local destPanel = sections.right
-    -- local endX = destPanel.x + destPanel.w / 2 - cfg.handPanel.cardW / 2
-    -- local endY = destPanel.y + destPanel.h / 2 - cfg.handPanel.cardH / 2
-
-    -- card.animX = startX
-    -- card.animY = startY
-
-    -- Animation.add {
-    --   duration = 0.4,
-    --   onUpdate = function(t)
-    --     local tt = 1 - (1 - t) ^ 2
-    --     card.animX = startX + (endX - startX) * tt
-    --     card.animY = startY + (endY - startY) * tt
-    --   end,
-    --   onComplete = function()
-    --     card.animX = nil
-    --     card.animY = nil
-    --     love.gameState = GameState.applyTransition(love.gameState, transition)
-    --     Renderer.transitionInProgress = false
-    --   end,
-    --   onDraw = function()
-    --     love.graphics.setColor(0.5, 0.5, 0.5)
-    --     love.graphics.rectangle("fill", card.animX, card.animY, cfg.handPanel.cardW, cfg.handPanel.cardH)
-    --     love.graphics.setColor(1, 0.5, 0.5)
-    --     love.graphics.rectangle("line", card.animX, card.animY, cfg.handPanel.cardW, cfg.handPanel.cardH)
-    --   end
-    -- }
+  elseif transition.type == "play" then
+    TransitionHandlers.handlePlay {
+      transition = transition,
+      sections = sections,
+      applyTransition = GameState.applyTransition,
+      setBusy = function(flag) Renderer.transitionInProgress = flag end
+    }
   else
     error("Unknown transition type: " .. transition.type)
   end
 end
+
+-- Debug draw rects
+-- local function drawFrame(r, color)
+--   lg.setColor(color)
+--   lg.rectangle("line", r.x, r.y, r.w, r.h)
+-- end
 
 Renderer.drawUI = function()
   Click.clear()
@@ -217,13 +144,13 @@ Renderer.drawUI = function()
   -- drawFrame(sections.right, c.red)
 
   SystemsUI.drawSystemsPanel(sections.systems)
+  LogsUI.drawLogs(sections.logs)
   HandUI.drawHand(sections.play)
-  LogsUI.drawLogs(sliceH(sections.effects, "right", 0.5))
-  DeckUI.drawDeck(sliceH(sections.deck, "left", 0.33))
-  RAMUI.drawRAM(sliceH(sections.deck, "center", 0.33))
-  ThreatUI.drawThreat(sliceV(sections.right, "top", 0.2))
-  DestructorUI.drawDestructor(sliceV(sections.right, "center", 0.5))
-  EndTurnUI.drawEndTurnButton(sliceV(sections.right, "bottom", 0.2))
+  DeckUI.drawDeck(sections.deck)
+  RAMUI.drawRAM(sections.ram)
+  ThreatUI.drawThreat(sections.threat)
+  DestructorUI.drawDestructor(sections.destructor)
+  EndTurnUI.drawEndTurnButton(sections.endTurn)
 
   Renderer.processTransitionQueue()
 end
