@@ -6,6 +6,7 @@ local Renderer = require("renderer")
 local Menu = require("ui.menu")
 local EndGameUI = require("ui.elements.end_game")
 local Animation = require("ui.animate")
+local Decorators = require("ui.decorators")
 
 package.path = package.path
     .. ";src/?.lua"
@@ -28,6 +29,8 @@ end
 
 function love.update(dt)
   Animation.update(dt)
+  Decorators.updateAll(dt)
+  Decorators.consumeAndDispatch()
 end
 
 function love.draw()
@@ -51,10 +54,7 @@ function love.draw()
 end
 
 function love.mousepressed(x, y, button)
-  local phase = love.gameState.turn.phase
   if EndGameUI.mousepressed(x, y, button) then return end
-  -- if phase == "won" or phase == "lost" then
-  -- end
 
   local vx, vy = Display.toVirtual(x, y)
   local hit = Click.hit(vx, vy)
@@ -64,9 +64,9 @@ function love.mousepressed(x, y, button)
     if hit.id == "endTurn" then
       love.gameState = GameState.endTurn(love.gameState)
 
-      if love.gameState.turn.phase == "start" or love.gameState.turn.phase == "in_progress" then
-        love.gameState = GameState.beginTurn(love.gameState)
-      end
+      -- if love.gameState.turn.phase == "start" or love.gameState.turn.phase == "in_progress" then
+      --   love.gameState = GameState.beginTurn(love.gameState)
+      -- end
     elseif hit.id == "card" then
       local payload = hit.payload -- which card was clicked
       love.gameState = GameState.playCard(love.gameState, payload.handIndex)

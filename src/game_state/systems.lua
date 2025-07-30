@@ -1,3 +1,4 @@
+local Decorators = require("ui.decorators")
 local Systems = {}
 
 function Systems.init()
@@ -13,10 +14,20 @@ function Systems.incrementProgress(systemList, currentSystemIndex, amount)
   for i, sys in ipairs(systemList) do
     local systemProgress = sys.progress
     if i == currentSystemIndex then
+      local delta = amount
       systemProgress = sys.progress + amount
       if systemProgress > sys.required then
         systemProgress = sys.required
+        delta = sys.required - sys.progress
+      elseif systemProgress < 0 then
+        systemProgress = 0
+        delta = -sys.progress
       end
+      -- Emit a decorator event for progress animation
+      Decorators.emit("systemProgress", {
+        systemIndex = i,
+        delta = delta
+      })
     end
     newList[i] = {
       name = sys.name,

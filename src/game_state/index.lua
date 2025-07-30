@@ -5,6 +5,9 @@ local Systems = require("game_state.systems")
 local DestructorQueue = require("game_state.destructor_queue")
 local Threat = require("game_state.threat")
 
+local Decorators = require("ui.decorators")
+
+
 function GameState.init()
   return {
     deck = Deck.init(),
@@ -42,9 +45,13 @@ function GameState.applyTransition(state, transition)
     local card = transition.payload.card
     card.selectable = true
     card.state = "idle"
-    table.insert(newState.hand, card)
+
     -- local newHand = Hand.drawCard(state.hand, card, state.handSize)
     -- newState.hand = newHand
+    table.insert(newState.hand, card)
+
+    newState = GameState.addLog(newState, "Drew card: " .. card.name)
+
   elseif transition.type == "discard" then
     local card = transition.payload.card
     local index = transition.payload.handIndex
@@ -56,6 +63,8 @@ function GameState.applyTransition(state, transition)
     newState.hand = newHand
     newState.destructorQueue = newDestructorQueue
     newState.ram = state.ram + transition.payload.amount
+    Decorators.emit("ramPulse", { amount = transition.payload.amount })
+
   elseif transition.type == "play" then
     local card = transition.payload.card
     local index = transition.payload.handIndex
@@ -85,6 +94,30 @@ function GameState.applyTransition(state, transition)
       newState.turn.phase = "won"
       newState = GameState.addLog(newState, "== ALL SYSTEMS RESTORED ==")
     end
+  elseif transition.type == "destructorPlay" then
+    local updatedQueue = transition.payload.updatedQueue
+    newState.destructorQueue = updatedQueue
+
+    local card = transition.payload.card
+    local amount = card.destructorEffect.amount
+
+    if card.destructorEffect.type == "threat" then
+      newState.threat = Threat.increment(state.threat, amount)
+      newState = GameState.addLog(newState, "Destructor triggered: +" .. amount .. " threat.")
+    elseif card.destructorEffect.type == "progress" then
+      newState.systems = Systems.incrementProgress(
+        state.systems,
+        state.currentSystemIndex,
+        amount
+      )
+      newState = GameState.addLog(newState, "Destructor triggered: " .. amount .. " progress.")
+      newState = GameState.updateCurrentSystemIndex(newState)
+    end
+
+    newState.deck = Deck.placeOnBottom(newState.deck, card)
+
+    newState = GameState.checkLossCondition(newState)
+    newState = GameState.beginTurn(newState)
   end
 
   return newState
@@ -124,10 +157,13 @@ end
 
 function GameState.beginTurn(state)
   local newState = GameState.shallowCopy(state)
+  newState.turn.phase = "start"
+
 
   newState.ram = 0
   if state.envEffect == "Gain 1 RAM at start of turn" then
     newState.ram = newState.ram + 1
+    Decorators.emit("ramPulse", { amount = 1 })
   end
   newState.turn.turnCount = newState.turn.turnCount + 1
   newState = GameState.addLog(newState, "-- Turn " .. newState.turn.turnCount .. " begins --")
@@ -143,36 +179,27 @@ function GameState.beginTurn(state)
     newState = GameState.drawCard(newState, virtualIndex)
   end
 
+  newState.turn.phase = "in_progress"
+
   return newState
 end
 
 function GameState.endTurn(state)
   local newState = GameState.shallowCopy(state)
 
+  newState.turn.phase = "end_turn"
   local destructorCard, updatedQueue = DestructorQueue.dequeue(state.destructorQueue)
-  newState.destructorQueue = updatedQueue
 
   if not destructorCard then
     newState = GameState.addLog(newState, "Destructor queue is empty :)")
+    newState = GameState.beginTurn(newState)
     return newState
   end
 
-  local amount = destructorCard.destructorEffect.amount
-  if destructorCard.destructorEffect and destructorCard.destructorEffect.type == "threat" then
-    newState.threat = Threat.increment(state.threat, amount)
-    newState = GameState.addLog(newState, "Destructor triggered: +" .. amount .. " threat.")
-  elseif destructorCard.destructorEffect and destructorCard.destructorEffect.type == "progress" then
-    newState.systems = Systems.incrementProgress(
-      state.systems,
-      state.currentSystemIndex,
-      destructorCard.destructorEffect.amount
-    )
-    newState = GameState.addLog(newState, "Destructor triggered: " .. amount .. " progress.")
-    newState = GameState.updateCurrentSystemIndex(newState)
-  end
-  newState.deck = Deck.placeOnBottom(newState.deck, destructorCard)
-
-  newState = GameState.checkLossCondition(newState)
+  newState = GameState.enqueueTransition(newState, "destructorPlay", {
+    card = destructorCard,
+    updatedQueue = updatedQueue
+  })
   return newState
 end
 
@@ -210,7 +237,7 @@ function GameState.drawCard(state, intendedIndex)
     index = intendedIndex
   })
 
-  newState = GameState.addLog(newState, "Drew card: " .. card.name)
+  -- newState = GameState.addLog(newState, "Drew card: " .. card.name)
   return newState
 end
 
@@ -244,29 +271,6 @@ function GameState.playCard(state, index)
     card = card,
     handIndex = index
   })
-  -- newState.hand = Hand.removeCardAt(state.hand, index)
-
-  -- if card.playEffect and card.playEffect.type == "progress" then
-  --   newState.systems = Systems.incrementProgress(
-  --     state.systems,
-  --     state.currentSystemIndex,
-  --     card.playEffect.amount
-  --   )
-  --   newState = GameState.updateCurrentSystemIndex(newState)
-  -- end
-
-  -- if card.playEffect and card.playEffect.type == "threat" then
-  --   local amount = card.playEffect.amount
-  --   newState.threat = Threat.increment(state.threat, amount)
-  -- end
-
-  -- newState.deck = Deck.placeOnBottom(newState.deck, card)
-
-  -- -- Check win condition after playing
-  -- if GameState.checkWinCondition(newState) then
-  --   newState.turn.phase = "won"
-  --   newState = GameState.addLog(newState, "== ALL SYSTEMS RESTORED ==")
-  -- end
 
   return newState
 end
@@ -274,6 +278,7 @@ end
 function GameState.addLog(state, entry)
   local newState = GameState.shallowCopy(state)
   table.insert(newState.log, entry)
+  Decorators.emit("logGlow", { message = entry })
   return newState
 end
 

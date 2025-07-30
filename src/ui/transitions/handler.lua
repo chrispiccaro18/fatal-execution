@@ -45,6 +45,7 @@ function TransitionHandlers.handleDiscard(args)
     onComplete = function()
       card.animX = nil
       card.animY = nil
+      -- require("ui.elements.ram").triggerPulse()
       love.gameState = applyTransition(love.gameState, transition)
       setBusy(false)
     end,
@@ -179,12 +180,10 @@ function TransitionHandlers.handlePlay(args)
         card.animScale = 1
 
         -- Apply transition only once during the pause
-        -- This ensures the game state is updated only once
         if not didApplyTransition then
           love.gameState = applyTransition(love.gameState, transition)
           didApplyTransition = true
         end
-
       else
         -- Phase 3: move to deck and shrink
         local t3 = (t - (duration1 + durationPause) / totalDuration) / (duration2 / totalDuration)
@@ -199,7 +198,6 @@ function TransitionHandlers.handlePlay(args)
       card.animY = nil
       card.animScale = nil
       card.state = "idle"
-      -- love.gameState = applyTransition(love.gameState, t)
       setBusy(false)
     end,
     onDraw = function()
@@ -210,8 +208,104 @@ function TransitionHandlers.handlePlay(args)
       local drawH = fullH * scale
 
       love.graphics.push()
-      love.graphics.translate(card.animX, card.animY) -- center point
+      love.graphics.translate(card.animX, card.animY)
       love.graphics.translate(-drawW / 2, -drawH / 2)
+
+      Card.drawFace(card, 0, 0, drawW, drawH, pad)
+
+      love.graphics.pop()
+    end
+  }
+end
+
+function TransitionHandlers.handleDestructorPlay(args)
+  local transition = args.transition
+  local card = transition.payload.card
+  local updatedQueue = transition.payload.updatedQueue
+  local sections = args.sections
+  local applyTransition = args.applyTransition
+  local setBusy = args.setBusy
+
+  local didApplyTransition = false
+
+  setBusy(true)
+
+  card.state = "destructorPlaying"
+  card.selectable = false
+
+  local destructorPanel = sections.destructor
+  local pad = cfg.destructorPanel.pad
+
+  -- Start: from destructor queue center
+  local startX = destructorPanel.x + destructorPanel.w / 2 - cfg.destructorPanel.cardW / 2
+  local startY = destructorPanel.y + destructorPanel.h / 2 - cfg.destructorPanel.cardH / 2
+
+  -- Mid: center of screen
+  local midX = Display.VIRTUAL_W / 2 - cfg.destructorPanel.cardW / 2
+  local midY = Display.VIRTUAL_H / 2 - cfg.destructorPanel.cardH / 2
+
+  -- End: under deck
+  local deckW = cfg.deckPanel.deckW
+  local deckH = cfg.deckPanel.deckH
+  local deckRect = sections.deck
+
+  local endX = deckRect.x + cfg.deckPanel.pad + deckW / 2
+  local endY = deckRect.y + cfg.deckPanel.pad + deckH / 2
+
+  card.animX, card.animY = startX, startY
+  card.animScale = 1
+
+  local duration1 = 0.3
+  local durationPause = 0.3
+  local duration2 = 0.2
+  local totalDuration = duration1 + durationPause + duration2
+
+  Animation.add {
+    duration = totalDuration,
+    onUpdate = function(t)
+      if t < duration1 / totalDuration then
+        -- Phase 1: move to center
+        local tt = t / (duration1 / totalDuration)
+        card.animX = startX + (midX - startX) * tt
+        card.animY = startY + (midY - startY) * tt
+        card.animScale = 1
+      elseif t < (duration1 + durationPause) / totalDuration then
+        -- Phase 2: pause in center
+        card.animX = midX
+        card.animY = midY
+        card.animScale = 1
+
+        -- Apply transition only once during the pause
+        if not didApplyTransition then
+          love.gameState = applyTransition(love.gameState, transition)
+          didApplyTransition = true
+        end
+      else
+        -- Phase 3: move to deck and shrink
+        local tt = (t - (duration1 + durationPause) / totalDuration) / (duration2 / totalDuration)
+        local ease = 1 - (1 - tt) ^ 2
+        card.animX = midX + (endX - midX) * tt
+        card.animY = midY + (endY - midY) * tt
+        card.animScale = 1 - 0.5 * ease
+      end
+    end,
+    onComplete = function()
+      card.animX = nil
+      card.animY = nil
+      card.animScale = nil
+      card.state = "idle"
+      setBusy(false)
+    end,
+    onDraw = function()
+      local fullW = cfg.destructorPanel.cardW
+      local fullH = cfg.destructorPanel.cardH
+      local scale = card.animScale or 1
+      local drawW = fullW * scale
+      local drawH = fullH * scale
+
+      love.graphics.push()
+      love.graphics.translate(card.animX, card.animY)
+      -- love.graphics.translate(-drawW / 2, -drawH / 2)
 
       Card.drawFace(card, 0, 0, drawW, drawH, pad)
 

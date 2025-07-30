@@ -17,7 +17,6 @@ local Renderer           = {}
 
 local sections           = {} -- will hold the rects we compute
 
--- Quick helper – returns a rect table
 local function rect(x, y, w, h) return { x = x, y = y, w = w, h = h } end
 
 local function sliceH(r, where, ratio)
@@ -114,6 +113,13 @@ function Renderer.processTransitionQueue()
     }
   elseif transition.type == "play" then
     TransitionHandlers.handlePlay {
+      transition = transition,
+      sections = sections,
+      applyTransition = GameState.applyTransition,
+      setBusy = function(flag) Renderer.transitionInProgress = flag end
+    }
+  elseif transition.type == "destructorPlay" then
+    TransitionHandlers.handleDestructorPlay {
       transition = transition,
       sections = sections,
       applyTransition = GameState.applyTransition,

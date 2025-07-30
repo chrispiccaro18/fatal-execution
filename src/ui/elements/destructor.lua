@@ -1,5 +1,5 @@
 local cfg          = require("ui.cfg")
-local Card     = require("ui.elements.card")
+local Card         = require("ui.elements.card")
 local lg           = love.graphics
 
 local DestructorUI = {}
@@ -24,7 +24,7 @@ function DestructorUI.drawDestructor(panelRect)
   lg.rectangle("fill", baseX, baseY, cardW, cardH)
 
   -- Top of queue
-  if #love.gameState.destructorQueue > 0 then
+  if #love.gameState.destructorQueue > 0 and love.gameState.destructorQueue[1].state == "idle" then
     local card = love.gameState.destructorQueue[1]
     local offsetX = C.displayCardOffsetX
     local offsetY = C.displayCardOffsetY
