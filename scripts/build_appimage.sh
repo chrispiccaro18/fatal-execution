@@ -5,6 +5,8 @@ echo "📦 [AppImage] Building..."
 
 cd "$(dirname "$0")/.."
 
+VERSION=$(grep 'Version.number' src/version.lua | cut -d'"' -f2)
+
 if [ ! -f build/tmp/fatal-exception.love ]; then
   echo "⚠️ build/tmp/fatal-exception.love not found. Run build_steam.sh first or generate it."
   exit 1
@@ -38,6 +40,8 @@ EOF
 cp static/fatal-exception.png build/tmp/appdir/ || true
 
 # Build
-appimagetool build/tmp/appdir build/fatal-exception.AppImage
+OUTPUT_NAME="fatal-exception-v$VERSION.AppImage"
+appimagetool build/tmp/appdir "build/$OUTPUT_NAME"
 
-echo "✅ [AppImage] Done: build/fatal-exception.AppImage"
+
+echo "✅ [AppImage] Done: build/$OUTPUT_NAME"
