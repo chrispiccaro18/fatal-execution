@@ -1,10 +1,19 @@
-local cfg       = require("ui.cfg")
-local Display   = require("ui.display")
-local Click     = require("ui.click")
-local GameState = require("game_state.index")
-local lg        = love.graphics
+local cfg         = require("ui.cfg")
+local Display     = require("ui.display")
+local Click       = require("ui.click")
+local Profiles = require("profiles.index")
+local ActiveProfile = require("profiles.active")
+local GameState   = require("game_state.index")
+local EventSystem = require("events.index")
+local lg          = love.graphics
 
-local EndGameUI = { isOpen = false }
+local EndGameUI   = { isOpen = false }
+
+local activeProfileIndex = ActiveProfile.get()
+
+EventSystem.subscribe("gameOver", function(phase)
+  EndGameUI.isOpen = true
+end)
 
 local function panelRect()
   -- centre the whole panel on the virtual canvas
@@ -36,41 +45,49 @@ function EndGameUI.draw()
   lg.setFont(lg.newFont(cfg.endGamePanel.fontSize))
   lg.printf(msg, P.x, P.y + P.pad, P.w, "center")
 
-  -- Two buttons
-  local restart     = cfg.endGamePanel.restartButton
-  local quit        = cfg.endGamePanel.quitButton
-  local gapY        = 24
+  -- Three buttons
+  local restart    = cfg.endGamePanel.restartButton
+  local quit       = cfg.endGamePanel.quitButton
 
-  local btnW, btnH  = restart.buttonW, restart.buttonH
-  local cx          = P.x + P.w / 2
+  local btnW, btnH = restart.buttonW, restart.buttonH
+  local cx         = P.x + P.w / 2
+  local startY     = P.y + P.pad + 80
+  local gapY       = 24
 
-  -- Restart button (upper)
-  local restartRect = {
-    x = cx - btnW / 2,
-    y = P.y + P.pad + 80,
-    w = btnW,
-    h = btnH
+  local buttons    = {
+    {
+      id = "play_again",
+      label = "Play Again",
+      y = startY,
+      style = restart
+    },
+    {
+      id = "main_menu",
+      label = "Main Menu",
+      y = startY + (btnH + gapY),
+      style = restart
+    },
+    {
+      id = "quit",
+      label = "Quit",
+      y = startY + 2 * (btnH + gapY),
+      style = quit
+    }
   }
-  Click.addButton("restart", restartRect, "Restart",
-                  {
-                    bg = restart.bgColor,
-                    border = restart.borderColor,
-                    text = restart.textColor
-                  }, restart.fontSize)
 
-  -- Quit button (below)
-  local quitRect = {
-    x = cx - btnW / 2,
-    y = restartRect.y + btnH + gapY,
-    w = btnW,
-    h = btnH
-  }
-  Click.addButton("quit", quitRect, "Quit",
-                  {
-                    bg = quit.bgColor,
-                    border = quit.borderColor,
-                    text = quit.textColor
-                  }, quit.fontSize)
+  for _, btn in ipairs(buttons) do
+    local rect = {
+      x = cx - btnW / 2,
+      y = btn.y,
+      w = btnW,
+      h = btnH
+    }
+    Click.addButton(btn.id, rect, btn.label, {
+                      bg = btn.style.bgColor,
+                      border = btn.style.borderColor,
+                      text = btn.style.textColor
+                    }, btn.style.fontSize)
+  end
 end
 
 function EndGameUI.mousepressed(px, py, button)
@@ -81,15 +98,23 @@ function EndGameUI.mousepressed(px, py, button)
   local hit    = Click.hit(vx, vy)
   if not hit then return end
 
-  if hit.id == "restart" then
+  if hit.id == "play_again" then
     local restartState = GameState.init()
+    Profiles.setCurrentRun(activeProfileIndex, restartState)
     restartState = GameState.beginTurn(restartState)
     love.gameState = restartState
     EndGameUI.isOpen = false
     Click.clear()
+  elseif hit.id == "main_menu" then
+    Profiles.clearCurrentRun(activeProfileIndex)
+    EndGameUI.isOpen = false
+    Click.clear()
+    CurrentScreen = "start"
   elseif hit.id == "quit" then
+    Profiles.clearCurrentRun(activeProfileIndex)
     love.event.quit()
   end
+  EndGameUI.isOpen = false
 end
 
 return EndGameUI

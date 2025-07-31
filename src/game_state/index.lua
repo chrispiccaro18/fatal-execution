@@ -1,12 +1,13 @@
-local GameState = {}
 local Deck = require("game_state.deck")
 local Hand = require("game_state.hand")
 local Systems = require("game_state.systems")
 local DestructorQueue = require("game_state.destructor_queue")
 local Threat = require("game_state.threat")
 
+local EventSystem = require("events.index")
 local Decorators = require("ui.decorators")
 
+local GameState = {}
 
 function GameState.init()
   return {
@@ -51,7 +52,6 @@ function GameState.applyTransition(state, transition)
     table.insert(newState.hand, card)
 
     newState = GameState.addLog(newState, "Drew card: " .. card.name)
-
   elseif transition.type == "discard" then
     local card = transition.payload.card
     local index = transition.payload.handIndex
@@ -64,7 +64,6 @@ function GameState.applyTransition(state, transition)
     newState.destructorQueue = newDestructorQueue
     newState.ram = state.ram + transition.payload.amount
     Decorators.emit("ramPulse", { amount = transition.payload.amount })
-
   elseif transition.type == "play" then
     local card = transition.payload.card
     local index = transition.payload.handIndex
@@ -93,6 +92,7 @@ function GameState.applyTransition(state, transition)
     if GameState.checkWinCondition(newState) then
       newState.turn.phase = "won"
       newState = GameState.addLog(newState, "== ALL SYSTEMS RESTORED ==")
+      EventSystem.emit("gameOver", "won")
     end
   elseif transition.type == "destructorPlay" then
     local updatedQueue = transition.payload.updatedQueue
@@ -117,7 +117,11 @@ function GameState.applyTransition(state, transition)
     newState.deck = Deck.placeOnBottom(newState.deck, card)
 
     newState = GameState.checkLossCondition(newState)
-    newState = GameState.beginTurn(newState)
+
+    local phase = love.gameState.turn.phase
+    if not (phase == "won" or phase == "lost") then
+      newState = GameState.beginTurn(newState)
+    end
   end
 
   return newState
@@ -217,6 +221,7 @@ function GameState.checkLossCondition(state)
   if state.threat.value >= state.threat.max then
     state = GameState.addLog(state, "!! SYSTEM FAILURE: Threat Level Exceeded !!")
     state.turn.phase = "lost"
+    EventSystem.emit("gameOver", "lost")
   end
   return state
 end
