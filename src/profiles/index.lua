@@ -27,84 +27,85 @@ local defaultData = {
 
 -- deep copy utility
 local function deepCopy(tbl)
-  if type(tbl) ~= "table" then
-    return tbl -- Return the value directly if it's not a table
-  end
+  if type(tbl) ~= "table" then return tbl end
   local copy = {}
   for k, v in pairs(tbl) do
-    copy[k] = deepCopy(v)
+    copy[deepCopy(k)] = deepCopy(v)
   end
   return copy
 end
 
+local function isValidCurrentRun(run)
+  if type(run) ~= "table" then return false end
+  local expected = GameState.init()
+
+  for k in pairs(run) do
+    if expected[k] == nil then return false end
+  end
+
+  for k, v in pairs(expected) do
+    if run[k] == nil or type(run[k]) ~= type(v) then
+      return false
+    end
+  end
+
+  return true
+end
+
+
 local function validateAndMigrate(data, expected, isRoot)
   expected = expected or defaultData
   isRoot = isRoot ~= false
+
+  local RECURSIVE_KEYS = {
+    settings = true,
+    progress = true,
+  }
+
   local wasModified = false
-  local isValid = true
 
-  if data.currentRun ~= nil and type(data.currentRun) == "table" then
-    local runExpectedShape = GameState.init()
-    for k, _ in pairs(data.currentRun) do
-      if runExpectedShape[k] == nil then
-        isValid = false
-        break
-      end
-    end
-    for k, v in pairs(runExpectedShape) do
-      if data.currentRun[k] == nil or type(data.currentRun[k]) ~= type(v) then
-        isValid = false
-        break
-      end
-    end
-  elseif data.currentRun ~= nil and type(data.currentRun) ~= "table" then
-    isValid = false
-  end
-
-  if not isValid then
+  if data.currentRun ~= nil and not isValidCurrentRun(data.currentRun) then
     print("[validateAndMigrate] currentRun is invalid → setting to nil")
     data.currentRun = nil
     wasModified = true
   end
 
   for k, v in pairs(expected) do
-    if k == "currentRun" then goto continue end
-
-    if data[k] == nil then
-      print(string.format("[validateAndMigrate] Missing field %s → adding default", k))
-      data[k] = deepCopy(v)
-      wasModified = true
-    elseif type(v) == "table" then
-      if type(data[k]) ~= "table" then
-        print(string.format("[validateAndMigrate] Field %s expected table, got %s → replacing with default", k,
-                            type(data[k])))
+    if k ~= "currentRun" then
+      if data[k] == nil then
+        print(string.format("[validateAndMigrate] Missing field %s → adding default", k))
         data[k] = deepCopy(v)
         wasModified = true
-      else
-        -- Only recurse into *expected* nested structures
-        if k == "settings" or k == "progress" then
-          if validateAndMigrate(data[k], v, false) then
-            wasModified = true
+      elseif type(v) == "table" then
+        if type(data[k]) ~= "table" then
+          print(string.format("[validateAndMigrate] Field %s expected table, got %s → replacing with default", k,
+                              type(data[k])))
+          data[k] = deepCopy(v)
+          wasModified = true
+        else
+          -- Only recurse into *expected* nested structures
+          if RECURSIVE_KEYS[k] then
+            if validateAndMigrate(data[k], v, false) then
+              wasModified = true
+            end
           end
         end
+      elseif type(data[k]) == "table" then
+        print(string.format("[validateAndMigrate] Field %s expected non-table, got table → replacing with default", k))
+        data[k] = deepCopy(v)
+        wasModified = true
       end
-    elseif type(data[k]) == "table" then
-      print(string.format("[validateAndMigrate] Field %s expected non-table, got table → replacing with default", k))
-      data[k] = deepCopy(v)
+    end
+
+    if isRoot and data.gameVersion ~= Version.number then
+      print(string.format("[validateAndMigrate] Updating gameVersion from %s to %s", tostring(data.gameVersion),
+                          tostring(Version.number)))
+      data.gameVersion = Version.number
       wasModified = true
     end
 
-    ::continue::
+    return wasModified
   end
-
-  if isRoot and data.gameVersion ~= Version.number then
-    print(string.format("[validateAndMigrate] Updating gameVersion from %s to %s", tostring(data.gameVersion),
-                        tostring(Version.number)))
-    data.gameVersion = Version.number
-    wasModified = true
-  end
-
-  return wasModified
 end
 
 -- Save file per profile
