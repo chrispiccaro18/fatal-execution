@@ -27,14 +27,22 @@ function Card.drawFace(card, x, y, w, h, pad)
   -- Play effect (optional)
   if card.playEffect then
     local e = card.playEffect
-    lg.printf("Play: " .. e.type .. " " .. e.amount, x + pad, textY, w - pad * 2, "center")
+    local amount = ""
+    if e.amount then
+      amount = e.amount
+    end
+    lg.printf("Play: " .. e.type .. " " .. amount, x + pad, textY, w - pad * 2, "center")
     textY = textY + lineH
   end
 
   -- Destructor effect (optional)
   if card.destructorEffect then
     local d = card.destructorEffect
-    lg.printf("Destructor: " .. d.type .. " " .. d.amount, x + pad, textY, w - pad * 2, "center")
+    local amount = ""
+    if d.amount then
+      amount = d.amount
+    end
+    lg.printf("Destructor: " .. d.type .. " " .. amount, x + pad, textY, w - pad * 2, "center")
   end
 
   lg.setColor(1, 1, 1)

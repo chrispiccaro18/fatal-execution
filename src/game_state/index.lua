@@ -89,6 +89,13 @@ function GameState.applyTransition(state, transition)
       newState.threat = Threat.increment(state.threat, card.playEffect.amount)
     end
 
+    if card.playEffect and card.playEffect.type == "shuffle_disruptor" then
+      newState.destructorQueue = DestructorQueue.shuffleDisruptor(
+        newState.destructorQueue
+      )
+      Decorators.emit("destructorShuffle")
+    end
+
     if GameState.checkWinCondition(newState) then
       newState.turn.phase = "won"
       newState = GameState.addLog(newState, "== ALL SYSTEMS RESTORED ==")
@@ -112,6 +119,17 @@ function GameState.applyTransition(state, transition)
       )
       newState = GameState.addLog(newState, "Destructor triggered: " .. amount .. " progress.")
       newState = GameState.updateCurrentSystemIndex(newState)
+    elseif card.destructorEffect.type == "draw_to_destructor" then
+      local cardToDraw = transition.payload.cardToDestructor
+      if not cardToDraw then
+        newState = GameState.addLog(newState, "Deck is empty, cannot draw a card to Destructor")
+      else
+        local newDeck = transition.payload.newDeckAfterDrawToDestructor
+        newState = GameState.addLog(newState, "Destructor triggered: " .. cardToDraw.name .. " added to Destructor.")
+        newState.deck = newDeck
+        newState.destructorQueue = DestructorQueue.enqueue(updatedQueue, cardToDraw)
+      end
+
     end
 
     newState.deck = Deck.placeOnBottom(newState.deck, card)
@@ -200,9 +218,22 @@ function GameState.endTurn(state)
     return newState
   end
 
+  local cardToDestructor = nil
+  local newDeckAfterDrawToDestructor = nil
+  if destructorCard.destructorEffect.type == "draw_to_destructor" then
+    -- check to see if deck has a card to draw
+    local cardToDraw, newDeck = Deck.draw(state.deck)
+    if cardToDraw then
+      cardToDestructor = cardToDraw
+      newDeckAfterDrawToDestructor = newDeck
+    end
+  end
+
   newState = GameState.enqueueTransition(newState, "destructorPlay", {
     card = destructorCard,
-    updatedQueue = updatedQueue
+    updatedQueue = updatedQueue,
+    cardToDestructor = cardToDestructor,
+    newDeckAfterDrawToDestructor = newDeckAfterDrawToDestructor
   })
   return newState
 end
@@ -242,7 +273,6 @@ function GameState.drawCard(state, intendedIndex)
     index = intendedIndex
   })
 
-  -- newState = GameState.addLog(newState, "Drew card: " .. card.name)
   return newState
 end
 

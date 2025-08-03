@@ -222,6 +222,8 @@ function TransitionHandlers.handleDestructorPlay(args)
   local transition = args.transition
   local card = transition.payload.card
   local updatedQueue = transition.payload.updatedQueue
+  local cardToDestructor = transition.payload.cardToDestructor
+  local newDeckAfterDrawToDestructor = transition.payload.newDeckAfterDrawToDestructor
   local sections = args.sections
   local applyTransition = args.applyTransition
   local setBusy = args.setBusy
@@ -277,6 +279,27 @@ function TransitionHandlers.handleDestructorPlay(args)
 
         -- Apply transition only once during the pause
         if not didApplyTransition then
+          if cardToDestructor then
+            local deckPanel = sections.deck
+            local destructorPanel = sections.destructor
+
+            local startX = deckPanel.x + deckPanel.w / 2
+            local startY = deckPanel.y + deckPanel.h / 2
+            local endX = destructorPanel.x + destructorPanel.w / 2
+            local endY = destructorPanel.y + destructorPanel.h / 2
+
+            require("ui.decorators").emit("drawToDestructor", {
+              card = cardToDestructor,
+              startX = startX,
+              startY = startY,
+              endX = endX,
+              endY = endY,
+              onComplete = function()
+                print('finished drawing to destructor')
+              end
+            })
+          end
+
           love.gameState = applyTransition(love.gameState, transition)
           didApplyTransition = true
         end

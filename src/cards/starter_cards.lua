@@ -63,11 +63,19 @@ local rawStarterCards = {
     playEffect = { type = "threat", amount = -1 },
     destructorEffect = { type = "progress", amount = -1 }
   },
-  {
-    name = "Memory Leak",
-    cost = 2,
-    playEffect = { type = "threat", amount = -2 },
-    destructorEffect = { type = "progress", amount = -2 }
+  -- {
+  --   name = "Memory Leak",
+  --   cost = 2,
+  --   playEffect = { type = "threat", amount = -2 },
+  --   destructorEffect = { type = "progress", amount = -2 }
+  -- },
+    {
+    -- id = 4,
+    -- tier = 0,
+    name = "System Shuffle",
+    cost = 1,
+    playEffect = { type = "shuffle_disruptor" },
+    destructorEffect = { type = "draw_to_destructor", amount = 1 },
   },
   {
     name = "Segmentation Fault",

@@ -19,4 +19,17 @@ function DestructorQueue.dequeue(queue)
   return queue[1], newQueue
 end
 
+local function shuffle(t)
+  local n = #t
+  for i = n, 2, -1 do
+    local j = math.random(1, i)
+    t[i], t[j] = t[j], t[i]
+  end
+  return t
+end
+
+function DestructorQueue.shuffleDisruptor(queue)
+  return shuffle(queue)
+end
+
 return DestructorQueue

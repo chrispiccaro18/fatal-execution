@@ -30,9 +30,46 @@ function Decorators.consumeAndDispatch()
       require("ui.elements.logs").triggerGlow(event.payload)
     elseif event.name == "systemProgress" then
       require("ui.elements.systems").triggerProgress(event.payload)
+    elseif event.name == "destructorShuffle" then
+      require("ui.elements.destructor").triggerShuffle()
+    elseif event.name == "drawToDestructor" then
+      Decorators.handleDrawToDestructor(event.payload)
     end
   end
   Decorators.events = {}
+end
+
+function Decorators.handleDrawToDestructor(payload)
+  local card = payload.card
+  local startX, startY = payload.startX, payload.startY
+  local endX, endY = payload.endX, payload.endY
+  local onComplete = payload.onComplete
+
+  card.animX = startX
+  card.animY = startY
+
+  require("ui.animate").add {
+    duration = 0.4,
+    onUpdate = function(t)
+      local tt = 1 - (1 - t) ^ 2
+      card.animX = startX + (endX - startX) * tt
+      card.animY = startY + (endY - startY) * tt
+    end,
+    onComplete = function()
+      card.animX = nil
+      card.animY = nil
+      if onComplete then onComplete() end
+    end,
+    onDraw = function()
+      require("ui.elements.card").drawFace(
+        card,
+        card.animX,
+        card.animY,
+        require("ui.cfg").handPanel.cardW,
+        require("ui.cfg").handPanel.cardH
+      )
+    end
+  }
 end
 
 return Decorators

@@ -1,8 +1,30 @@
-local cfg          = require("ui.cfg")
-local Card         = require("ui.elements.card")
-local lg           = love.graphics
+local cfg              = require("ui.cfg")
+local Card             = require("ui.elements.card")
+local Decorators       = require("ui.decorators")
+local lg               = love.graphics
 
-local DestructorUI = {}
+local DestructorUI     = {
+  shuffleTimers = {}
+}
+
+local SHUFFLE_DURATION = 0.8
+
+function DestructorUI.triggerShuffle()
+  DestructorUI.shuffleTimers["deck"] = SHUFFLE_DURATION
+end
+
+function DestructorUI.update(dt)
+  for key, timer in pairs(DestructorUI.shuffleTimers) do
+    timer = timer - dt
+    if timer <= 0 then
+      DestructorUI.shuffleTimers[key] = nil
+    else
+      DestructorUI.shuffleTimers[key] = timer
+    end
+  end
+end
+
+Decorators.register(DestructorUI.update)
 
 function DestructorUI.drawDestructor(panelRect)
   local C     = cfg.destructorPanel
@@ -20,71 +42,28 @@ function DestructorUI.drawDestructor(panelRect)
   local baseX = centerX - cardW / 2
   local baseY = centerY - cardH / 2
 
+  -- Shuffle animation
+  local offsetX, offsetY = 0, 0
+  if DestructorUI.shuffleTimers["deck"] then
+    local pct = 1 - (DestructorUI.shuffleTimers["deck"] / SHUFFLE_DURATION)
+    local shake = math.sin(pct * math.pi * 4) * 5 -- Oscillates 4 times
+    offsetX = shake
+    offsetY = shake
+  end
+
   lg.setColor(0.8, 0.2, 0.2)
-  lg.rectangle("fill", baseX, baseY, cardW, cardH)
+  lg.rectangle("fill", baseX + offsetX, baseY + offsetY, cardW, cardH)
 
   -- Top of queue
-  if #love.gameState.destructorQueue > 0 and love.gameState.destructorQueue[1].state == "idle" then
+  if not DestructorUI.shuffleTimers["deck"] and #love.gameState.destructorQueue > 0 and love.gameState.destructorQueue[1].state == "idle" then
     local card = love.gameState.destructorQueue[1]
-    local offsetX = C.displayCardOffsetX
-    local offsetY = C.displayCardOffsetY
-    local previewX = baseX + offsetX
-    local previewY = baseY + offsetY
+    local cardOffsetX = C.displayCardOffsetX
+    local cardOffsetY = C.displayCardOffsetY
+    local previewX = baseX + cardOffsetX
+    local previewY = baseY + cardOffsetY
 
     Card.drawFace(card, previewX, previewY, cardW, cardH, pad)
   end
 end
 
 return DestructorUI
-
--- function DestructorUI.drawDestructor(panelRect)
---   local C   = cfg.destructorPanel
---   local pad = C.pad
-
---   local cardW  = C.cardW
---   local cardH  = C.cardH
---   -- center deck in panel
---   local deckX = panelRect.x + (panelRect.w - cardW) / 2
---   local deckY = panelRect.y + (panelRect.h - cardH) / 2
-
-
---   -- background
---   -- lg.setColor(0,0,0,0.5)
---   -- lg.rectangle("fill", panelRect.x, panelRect.y, panelRect.w, panelRect.h)
-
---   -- border
---   lg.setColor(1,1,1)
---   lg.rectangle("line", panelRect.x, panelRect.y, panelRect.w, panelRect.h)
-
---   -- draw destructor deck as red rectangle
---   lg.setColor(0.8, 0.2, 0.2) -- Red color for the destructor deck
---   lg.rectangle("fill", deckX, deckY, cardW, cardH)
-
---   -- draw the first card in the destructor queue if it exists
---   if #love.gameState.destructorQueue > 0 then
---     -- display first card with offsetX and offsetY
---     local offsetX = C.displayCardOffsetX
---     local offsetY = C.displayCardOffsetY
---     local cardX = deckX + offsetX
---     local cardY = deckY + offsetY
-
---     local firstCard = love.gameState.destructorQueue[1]
---     lg.setColor(0.8,0.8,0.8) -- light gray for the card background
---     lg.rectangle("fill", cardX, cardY, cardW, cardH)
-
---     lg.setColor(0,0,0) -- black text
---     lg.setFont(lg.newFont(C.fontSize))
---     lg.printf(firstCard.name,
---               cardX + pad,
---               cardY + pad,
---               cardW - pad*2,
---               "center")
---     lg.printf("Destructor Effect: " .. (firstCard.destructorEffect.type or "None") .. " " .. (firstCard.destructorEffect.amount or ""),
---               cardX + pad,
---               cardY + pad + C.fontSize,
---               cardW - pad*2,
---               "center")
---   end
--- end
-
--- return DestructorUI
