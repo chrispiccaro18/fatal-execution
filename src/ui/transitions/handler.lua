@@ -119,6 +119,7 @@ end
 function TransitionHandlers.handlePlay(args)
   local transition = args.transition
   local card = transition.payload.card
+  local cardsToDraw = transition.payload.cardsToDraw
   local index = transition.payload.handIndex
   local sections = args.sections
   local applyTransition = args.applyTransition
@@ -181,6 +182,37 @@ function TransitionHandlers.handlePlay(args)
 
         -- Apply transition only once during the pause
         if not didApplyTransition then
+          if cardsToDraw and #cardsToDraw > 0 then
+            local deckPanel = sections.deck
+            local handPanel = sections.play
+
+            local startX = deckPanel.x + pad
+            local startY = deckPanel.y + pad
+            local endY = handPanel.y + pad
+            
+            -- emit in loop for each card
+            for i = 1, #cardsToDraw do
+              local delay = (i - 1) * 0.2 -- staggered delay for each card
+              -- we'll have to figure out the endX based on current hand and index
+              local cardsInHand = love.gameState.hand
+              local xOffset = (#cardsInHand - 1 + i - 1) * (cardW + spacingX)
+              local endX = handPanel.x + pad + xOffset
+              require("ui.decorators").emit("drawToHand", {
+                card = cardsToDraw[i],
+                startX = startX,
+                startY = startY,
+                endX = endX,
+                endY = endY,
+                onComplete = function()
+                  print('finished drawing to hand')
+                  cardsToDraw[i].selectable = true
+                  cardsToDraw[i].state = "idle"
+                end,
+                delay = delay
+              })
+            end
+          end
+
           love.gameState = applyTransition(love.gameState, transition)
           didApplyTransition = true
         end

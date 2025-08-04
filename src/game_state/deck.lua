@@ -23,6 +23,19 @@ function Deck.draw(deck)
   return deck[1], newDeck
 end
 
+function Deck.drawMultiple(deck, amount)
+  local drawnCards = {}
+  local newDeck = {}
+  for i = 1, #deck do
+    if #drawnCards < amount then
+      table.insert(drawnCards, deck[i])
+    else
+      table.insert(newDeck, deck[i])
+    end
+  end
+  return drawnCards, newDeck
+end
+
 function Deck.placeOnBottom(deck, card)
   local newDeck = {}
   for i = 1, #deck do

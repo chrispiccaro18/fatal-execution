@@ -96,6 +96,28 @@ function GameState.applyTransition(state, transition)
       Decorators.emit("destructorShuffle")
     end
 
+    if card.playEffect and card.playEffect.type == "draw" then
+      local cardsToDraw = transition.payload.cardsToDraw
+      local newDeckAfterDraws = transition.payload.newDeckAfterDraws
+
+      if cardsToDraw then
+        for _, drawnCard in ipairs(cardsToDraw) do
+          -- drawnCard.selectable = true
+          -- drawnCard.state = "idle"
+          table.insert(newState.hand, drawnCard)
+          newState = GameState.addLog(newState, "Drew card: " .. drawnCard.name)
+          -- emit draw decorator
+        end
+        newState.deck = newDeckAfterDraws
+      end
+
+      if not cardsToDraw or #cardsToDraw == 0 then
+        newState = GameState.addLog(newState, "Deck is empty, could not draw any cards.")
+      elseif #cardsToDraw < card.playEffect.amount then
+        newState = GameState.addLog(newState, "Deck is empty, could not draw all requested cards.")
+      end
+    end
+
     if GameState.checkWinCondition(newState) then
       newState.turn.phase = "won"
       newState = GameState.addLog(newState, "== ALL SYSTEMS RESTORED ==")
@@ -129,7 +151,6 @@ function GameState.applyTransition(state, transition)
         newState.deck = newDeck
         newState.destructorQueue = DestructorQueue.enqueue(updatedQueue, cardToDraw)
       end
-
     end
 
     newState.deck = Deck.placeOnBottom(newState.deck, card)
@@ -302,9 +323,24 @@ function GameState.playCard(state, index)
   newState = GameState.addLog(newState, "Played card: " .. card.name)
   newState.ram = newState.ram - card.cost
 
+  local cardsToDraw = nil
+  local newDeckAfterDraws = nil
+  if card.playEffect.type == "draw" then
+    local amountToDraw = card.playEffect.amount
+    cardsToDraw, newDeckAfterDraws = Deck.drawMultiple(state.deck, amountToDraw)
+
+    for i = 1, #cardsToDraw do
+      local drawnCard = cardsToDraw[i]
+      drawnCard.selectable = false
+      drawnCard.state = "animating"
+    end
+  end
+
   newState = GameState.enqueueTransition(newState, "play", {
     card = card,
-    handIndex = index
+    handIndex = index,
+    cardsToDraw = cardsToDraw,
+    newDeckAfterDraws = newDeckAfterDraws
   })
 
   return newState
