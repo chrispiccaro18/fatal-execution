@@ -31,6 +31,15 @@ function Card.drawFace(card, x, y, w, h, pad, hasNullify)
   local lineH = cfg.handPanel.fontSize
   local textY = y + pad
 
+    -- Apply shake offset if the card is shaking
+  local shakeOffset = 0
+  if Card.shakeTimers[card.name] then
+    local shakeProgress = Card.shakeTimers[card.name] / SHAKE_DURATION
+    shakeOffset = math.sin(love.timer.getTime() * 20) * 5 * shakeProgress
+  end
+
+  x = x + shakeOffset
+
   lg.setColor(0.8, 0.8, 0.8)
   lg.rectangle("fill", x, y, w, h)
 
