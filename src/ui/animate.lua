@@ -34,7 +34,9 @@ end
 
 function Animation.draw()
   for _, anim in ipairs(Animation.active) do
-    if anim.onDraw then anim.onDraw() end
+    if anim.time >= anim.delay and anim.onDraw then
+      anim.onDraw()
+    end
   end
 end
 

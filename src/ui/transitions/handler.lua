@@ -63,57 +63,49 @@ end
 
 function TransitionHandlers.handleDraw(args)
   local transition = args.transition
-  local card = transition.payload.card
-  local index = transition.payload.index
+  local cardsToDraw = transition.payload.cardsToDraw
   local sections = args.sections
   local applyTransition = args.applyTransition
   local setBusy = args.setBusy
 
   setBusy(true)
 
+  local cardW = cfg.handPanel.cardW
   local deckPanel = sections.deck
   local handPanel = sections.play
   local pad = cfg.handPanel.pad
-
-  local spacingX = math.min(cfg.handPanel.maxSpacingX,
-                            (handPanel.w - pad * 2 - cfg.handPanel.cardW * index) / math.max(1, index - 1))
-  local xOffset = (index - 1) * (cfg.handPanel.cardW + spacingX)
-
   local startX = deckPanel.x + pad
   local startY = deckPanel.y + pad
-  local endX = handPanel.x + pad + xOffset
   local endY = handPanel.y + pad
+  local spacingX = math.min(cfg.handPanel.maxSpacingX,
+                            (sections.play.w - pad * 2 - cardW * #love.gameState.hand) /
+                            math.max(1, #love.gameState.hand - 1))
 
-  card.animX = startX
-  card.animY = startY
-  card.state = "animating"
-  card.selectable = false
+  for i = 1, #cardsToDraw do
+    local card = cardsToDraw[i]
+    local delay = (i - 1) * 0.2 -- staggered delay for each card
+    card.state = "animating"
+    card.selectable = false
 
-  Animation.add {
-    duration = 0.4,
-    onUpdate = function(t)
-      local tt = 1 - (1 - t) ^ 2
-      card.animX = startX + (endX - startX) * tt
-      card.animY = startY + (endY - startY) * tt
-    end,
-    onComplete = function()
-      card.animX = nil
-      card.animY = nil
-      card.state = "idle"
-      card.selectable = true
-      love.gameState = applyTransition(love.gameState, transition)
-      setBusy(false)
-    end,
-    onDraw = function()
-      Card.drawFace(
-        card,
-        card.animX,
-        card.animY,
-        cfg.handPanel.cardW,
-        cfg.handPanel.cardH
-      )
-    end
-  }
+    local cardsInHand = love.gameState.hand
+    local xOffset = (#cardsInHand + i - 1) * (cardW + spacingX)
+    local endX = handPanel.x + pad + xOffset
+    require("ui.decorators").emit("drawToHand", {
+      card = cardsToDraw[i],
+      startX = startX,
+      startY = startY,
+      endX = endX,
+      endY = endY,
+      onComplete = function()
+        cardsToDraw[i].selectable = true
+        cardsToDraw[i].state = "idle"
+      end,
+      delay = delay
+    })
+  end
+
+  love.gameState = applyTransition(love.gameState, transition)
+  setBusy(false)
 end
 
 function TransitionHandlers.handlePlay(args)
@@ -189,12 +181,13 @@ function TransitionHandlers.handlePlay(args)
             local startX = deckPanel.x + pad
             local startY = deckPanel.y + pad
             local endY = handPanel.y + pad
-            
+
             -- emit in loop for each card
             for i = 1, #cardsToDraw do
               local delay = (i - 1) * 0.2 -- staggered delay for each card
               -- we'll have to figure out the endX based on current hand and index
               local cardsInHand = love.gameState.hand
+              -- #cardsInHand - 1 because the played card is still "in hand" during the animation
               local xOffset = (#cardsInHand - 1 + i - 1) * (cardW + spacingX)
               local endX = handPanel.x + pad + xOffset
               require("ui.decorators").emit("drawToHand", {
@@ -204,7 +197,6 @@ function TransitionHandlers.handlePlay(args)
                 endX = endX,
                 endY = endY,
                 onComplete = function()
-                  print('finished drawing to hand')
                   cardsToDraw[i].selectable = true
                   cardsToDraw[i].state = "idle"
                 end,
@@ -328,14 +320,14 @@ function TransitionHandlers.handleDestructorPlay(args)
               endX = endX,
               endY = endY,
               onComplete = function()
-                print('finished drawing to destructor')
+                card.state = "idle"
               end
             })
           end
 
           love.gameState = applyTransition(love.gameState, transition)
           didApplyTransition = true
-          
+
           if hasNullify then
             hasNullify = false
           end

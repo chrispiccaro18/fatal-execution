@@ -44,15 +44,23 @@ function GameState.applyTransition(state, transition)
   local newState = GameState.shallowCopy(state)
 
   if transition.type == "draw" then
-    local card = transition.payload.card
-    card.selectable = true
-    card.state = "idle"
+    local cardsToDraw = transition.payload.cardsToDraw
+    local newDeck = transition.payload.newDeck
+    local requestedNumberOfCardsToDraw = transition.payload.requestedNumberOfCardsToDraw
 
-    -- local newHand = Hand.drawCard(state.hand, card, state.handSize)
-    -- newState.hand = newHand
-    table.insert(newState.hand, card)
+    if cardsToDraw then
+      for _, drawnCard in ipairs(cardsToDraw) do
+        table.insert(newState.hand, drawnCard)
+        newState = GameState.addLog(newState, "Drew card: " .. drawnCard.name)
+      end
+      newState.deck = newDeck
+    end
 
-    newState = GameState.addLog(newState, "Drew card: " .. card.name)
+    if not cardsToDraw or #cardsToDraw == 0 then
+      newState = GameState.addLog(newState, "Deck is empty, could not draw any cards.")
+    elseif #cardsToDraw < requestedNumberOfCardsToDraw then
+      newState = GameState.addLog(newState, "Deck is empty, could not draw all cards.")
+    end
   elseif transition.type == "discard" then
     local card = transition.payload.card
     local index = transition.payload.handIndex
@@ -113,11 +121,8 @@ function GameState.applyTransition(state, transition)
 
       if cardsToDraw then
         for _, drawnCard in ipairs(cardsToDraw) do
-          -- drawnCard.selectable = true
-          -- drawnCard.state = "idle"
           table.insert(newState.hand, drawnCard)
           newState = GameState.addLog(newState, "Drew card: " .. drawnCard.name)
-          -- emit draw decorator
         end
         newState.deck = newDeckAfterDraws
       end
@@ -179,7 +184,7 @@ function GameState.applyTransition(state, transition)
         newState.destructorQueue = DestructorQueue.enqueue(updatedQueue, cardToDraw)
       end
     elseif card.destructorEffect.type == "threat_multiplier" then
-      newState.threat = Threat.increment(state.threat, amount * state.threat.value)
+      newState.threat = Threat.set(state.threat, amount * state.threat.value)
       newState = GameState.addLog(newState, "Destructor triggered: " .. amount .. "x threat multiplier applied.")
       Decorators.emit("threatPulse")
     end
@@ -233,7 +238,6 @@ function GameState.beginTurn(state)
   local newState = GameState.shallowCopy(state)
   newState.turn.phase = "start"
 
-
   newState.ram = 0
   if state.envEffect == "Gain 1 RAM at start of turn" then
     newState.ram = newState.ram + 1
@@ -243,15 +247,24 @@ function GameState.beginTurn(state)
   newState = GameState.addLog(newState, "-- Turn " .. newState.turn.turnCount .. " begins --")
 
   -- calculate how many cards to draw based on hand size
-  local numCardsToDraw = newState.handSize - #newState.hand
-  if numCardsToDraw < 0 then
-    numCardsToDraw = 0
+  local requestedNumberOfCardsToDraw = newState.handSize - #newState.hand
+  if requestedNumberOfCardsToDraw < 0 then
+    requestedNumberOfCardsToDraw = 0
   end
 
-  for i = 1, numCardsToDraw do
-    local virtualIndex = #newState.hand + i
-    newState = GameState.drawCard(newState, virtualIndex)
+  local cardsToDraw, newDeck = Deck.drawMultiple(newState.deck, requestedNumberOfCardsToDraw)
+
+  for i = 1, #cardsToDraw do
+    local drawnCard = cardsToDraw[i]
+    drawnCard.selectable = false
+    drawnCard.state = "animating"
   end
+
+  newState = GameState.enqueueTransition(newState, "draw", {
+    cardsToDraw = cardsToDraw,
+    newDeck = newDeck,
+    requestedNumberOfCardsToDraw = requestedNumberOfCardsToDraw
+  })
 
   newState.turn.phase = "in_progress"
 
@@ -312,25 +325,6 @@ function GameState.checkLossCondition(state)
     EventSystem.emit("gameOver", "lost")
   end
   return state
-end
-
-function GameState.drawCard(state, intendedIndex)
-  local newState = GameState.shallowCopy(state)
-  local card, newDeck = Deck.draw(state.deck)
-
-  if not card then
-    newState = GameState.addLog(newState, "Deck is empty, cannot draw a card.")
-    return newState
-  end
-
-  newState.deck = newDeck
-
-  newState = GameState.enqueueTransition(newState, "draw", {
-    card = card,
-    index = intendedIndex
-  })
-
-  return newState
 end
 
 function GameState.discardCardForRam(state, index)
