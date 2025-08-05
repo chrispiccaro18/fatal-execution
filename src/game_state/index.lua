@@ -16,6 +16,7 @@ function GameState.init()
     handSize = 4,
     systems = Systems.init(),
     destructorQueue = DestructorQueue.init(),
+    destructorNullify = 0,
     ram = 0,
     turn = {
       phase = "start",
@@ -63,7 +64,16 @@ function GameState.applyTransition(state, transition)
     newState.hand = newHand
     newState.destructorQueue = newDestructorQueue
     newState.ram = state.ram + transition.payload.amount
-    Decorators.emit("ramPulse", { amount = transition.payload.amount })
+
+    if card.onDiscard then
+      local discardEffect = card.onDiscard
+      if discardEffect.type == "ram_multiplier" then
+        newState.ram = newState.ram * discardEffect.amount
+        -- newState = GameState.addLog(newState, "RAM multiplier applied: " .. discardEffect.amount .. "x")
+      end
+    end
+
+    Decorators.emit("ramPulse")
   elseif transition.type == "play" then
     local card = transition.payload.card
     local index = transition.payload.handIndex
@@ -87,6 +97,7 @@ function GameState.applyTransition(state, transition)
 
     if card.playEffect and card.playEffect.type == "threat" then
       newState.threat = Threat.increment(state.threat, card.playEffect.amount)
+      Decorators.emit("threatPulse")
     end
 
     if card.playEffect and card.playEffect.type == "shuffle_disruptor" then
@@ -118,6 +129,11 @@ function GameState.applyTransition(state, transition)
       end
     end
 
+    if card.playEffect and card.playEffect.type == "nullify_destructor" then
+      newState.destructorNullify = newState.destructorNullify + card.playEffect.amount
+      newState = GameState.addLog(newState, "Destructor nullified +1. Total: " .. newState.destructorNullify)
+    end
+
     if GameState.checkWinCondition(newState) then
       newState.turn.phase = "won"
       newState = GameState.addLog(newState, "== ALL SYSTEMS RESTORED ==")
@@ -130,9 +146,20 @@ function GameState.applyTransition(state, transition)
     local card = transition.payload.card
     local amount = card.destructorEffect.amount
 
+    if transition.payload.hasNullify then
+      -- emit nullify decorator
+      Decorators.emit("cardShake", { cardId = card.name })
+      newState.destructorNullify = newState.destructorNullify - 1
+      newState = GameState.addLog(newState, "Destructor nullified, no effect applied.")
+      newState.deck = Deck.placeOnBottom(newState.deck, card)
+      newState = GameState.beginTurn(newState)
+      return newState
+    end
+
     if card.destructorEffect.type == "threat" then
       newState.threat = Threat.increment(state.threat, amount)
       newState = GameState.addLog(newState, "Destructor triggered: +" .. amount .. " threat.")
+      Decorators.emit("threatPulse")
     elseif card.destructorEffect.type == "progress" then
       newState.systems = Systems.incrementProgress(
         state.systems,
@@ -151,6 +178,10 @@ function GameState.applyTransition(state, transition)
         newState.deck = newDeck
         newState.destructorQueue = DestructorQueue.enqueue(updatedQueue, cardToDraw)
       end
+    elseif card.destructorEffect.type == "threat_multiplier" then
+      newState.threat = Threat.increment(state.threat, amount * state.threat.value)
+      newState = GameState.addLog(newState, "Destructor triggered: " .. amount .. "x threat multiplier applied.")
+      Decorators.emit("threatPulse")
     end
 
     newState.deck = Deck.placeOnBottom(newState.deck, card)
@@ -235,6 +266,10 @@ function GameState.endTurn(state)
 
   if not destructorCard then
     newState = GameState.addLog(newState, "Destructor queue is empty :)")
+    if state.destructorNullify > 0 then
+      newState.destructorNullify = state.destructorNullify - 1
+      newState = GameState.addLog(newState, "Destructor nullified, but no card played.")
+    end
     newState = GameState.beginTurn(newState)
     return newState
   end
@@ -254,7 +289,8 @@ function GameState.endTurn(state)
     card = destructorCard,
     updatedQueue = updatedQueue,
     cardToDestructor = cardToDestructor,
-    newDeckAfterDrawToDestructor = newDeckAfterDrawToDestructor
+    newDeckAfterDrawToDestructor = newDeckAfterDrawToDestructor,
+    hasNullify = state.destructorNullify > 0
   })
   return newState
 end
@@ -307,13 +343,28 @@ function GameState.discardCardForRam(state, index)
     amount = card.cost
   })
 
-  newState = GameState.addLog(newState, "Discarded " .. card.name .. " for " .. card.cost .. " RAM.")
+  if card.onDiscard then
+    local discardEffect = card.onDiscard
+    local discardText = "Discarded " .. card.name .. ": " .. discardEffect.type
+    if discardEffect.amount then
+      discardText = discardText .. " " .. discardEffect.amount
+    end
+    newState = GameState.addLog(newState, discardText)
+  else
+    newState = GameState.addLog(newState, "Discarded " .. card.name .. " for " .. card.cost .. " RAM.")
+  end
+
   return newState
 end
 
 function GameState.playCard(state, index)
   local newState = GameState.shallowCopy(state)
   local card = state.hand[index]
+
+  if card.noPlay then
+    newState = GameState.addLog(newState, "Cannot play " .. card.name .. ". Can only discard.")
+    return newState
+  end
 
   if state.ram < card.cost then
     newState = GameState.addLog(newState, "Not enough RAM to play " .. card.name .. ".")
@@ -322,6 +373,7 @@ function GameState.playCard(state, index)
 
   newState = GameState.addLog(newState, "Played card: " .. card.name)
   newState.ram = newState.ram - card.cost
+  Decorators.emit("ramPulse")
 
   local cardsToDraw = nil
   local newDeckAfterDraws = nil

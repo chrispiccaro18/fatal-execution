@@ -32,6 +32,10 @@ function Decorators.consumeAndDispatch()
       require("ui.elements.systems").triggerProgress(event.payload)
     elseif event.name == "destructorShuffle" then
       require("ui.elements.destructor").triggerShuffle()
+    elseif event.name == "cardShake" then
+      require("ui.elements.card").triggerShake(event.payload.cardId)
+    elseif event.name == "threatPulse" then
+      require("ui.elements.threat").triggerPulse()
     elseif event.name == "drawToDestructor" then
       Decorators.handleDrawToDestructor(event.payload)
     elseif event.name == "drawToHand" then

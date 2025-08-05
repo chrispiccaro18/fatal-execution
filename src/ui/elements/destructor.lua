@@ -62,7 +62,9 @@ function DestructorUI.drawDestructor(panelRect)
     local previewX = baseX + cardOffsetX
     local previewY = baseY + cardOffsetY
 
-    Card.drawFace(card, previewX, previewY, cardW, cardH, pad)
+    local hasNullify = love.gameState.destructorNullify > 0
+
+    Card.drawFace(card, previewX, previewY, cardW, cardH, pad, hasNullify)
   end
 end
 

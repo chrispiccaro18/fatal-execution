@@ -255,6 +255,7 @@ function TransitionHandlers.handleDestructorPlay(args)
   local card = transition.payload.card
   local updatedQueue = transition.payload.updatedQueue
   local cardToDestructor = transition.payload.cardToDestructor
+  local hasNullify = transition.payload.hasNullify
   local newDeckAfterDrawToDestructor = transition.payload.newDeckAfterDrawToDestructor
   local sections = args.sections
   local applyTransition = args.applyTransition
@@ -311,7 +312,7 @@ function TransitionHandlers.handleDestructorPlay(args)
 
         -- Apply transition only once during the pause
         if not didApplyTransition then
-          if cardToDestructor then
+          if cardToDestructor and not hasNullify then
             local deckPanel = sections.deck
             local destructorPanel = sections.destructor
 
@@ -334,6 +335,10 @@ function TransitionHandlers.handleDestructorPlay(args)
 
           love.gameState = applyTransition(love.gameState, transition)
           didApplyTransition = true
+          
+          if hasNullify then
+            hasNullify = false
+          end
         end
       else
         -- Phase 3: move to deck and shrink

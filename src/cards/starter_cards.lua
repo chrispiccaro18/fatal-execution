@@ -4,6 +4,8 @@ local function newCard(props)
     cost = props.cost or 0,
     playEffect = props.playEffect or { type = "none", amount = 0 },
     destructorEffect = props.destructorEffect or { type = "none", amount = 0 },
+    onDiscard = props.onDiscard or nil,
+    noPlay = props.noPlay or false, -- if true, card cannot be played,
 
     -- UI-related transient fields
     state = "idle", -- "idle", "animating", etc.
@@ -33,7 +35,7 @@ local rawStarterCards = {
     playEffect = { type = "progress", amount = 1 },
     destructorEffect = { type = "threat", amount = 3 }
   },
-    {
+  {
     name = "Memory Leak",
     cost = 1,
     playEffect = { type = "threat", amount = -2 },
@@ -67,13 +69,31 @@ local rawStarterCards = {
     playEffect = { type = "draw", amount = 2 },
     destructorEffect = { type = "draw_to_destructor", amount = 1 },
   },
+  {
+    -- id = 8,
+    -- tier = 0,
+    name = "Anomaly Mask",
+    cost = 2,
+    playEffect = { type = "nullify_destructor", amount = 1 },
+    destructorEffect = { type = "threat", amount = 3 },
+  },
+  {
+    -- id = 9,
+    -- tier = 0,
+    name = "Pulse Spike",
+    cost = 0,
+    noPlay = true,
+    onDiscard = { type = "ram_multiplier", amount = 2 },
+    playEffect = { type = "none" },
+    destructorEffect = { type = "threat_multiplier", amount = 2 },
+  },
   -- {
   --   name = "Segmentation Fault",
   --   cost = 3,
   --   playEffect = { type = "progress", amount = 3 },
   --   destructorEffect = { type = "threat", amount = 4 }
   -- },
-    -- {
+  -- {
   --   name = "Canaries",
   --   cost = 1,
   --   playEffect = { type = "threat", amount = -1 },

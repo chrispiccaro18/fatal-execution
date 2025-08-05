@@ -1,10 +1,33 @@
 local cfg = require("ui.cfg")
+local Decorators = require("ui.decorators")
 local lg  = love.graphics
 
-local Card = {}
+local Card = {
+  shakeTimers = {}
+}
 
-function Card.drawFace(card, x, y, w, h, pad)
+local SHAKE_DURATION = 0.3
+
+function Card.triggerShake(cardId)
+  Card.shakeTimers[cardId] = SHAKE_DURATION
+end
+
+function Card.update(dt)
+  for cardId, timer in pairs(Card.shakeTimers) do
+    timer = timer - dt
+    if timer <= 0 then
+      Card.shakeTimers[cardId] = nil
+    else
+      Card.shakeTimers[cardId] = timer
+    end
+  end
+end
+
+Decorators.register(Card.update)
+
+function Card.drawFace(card, x, y, w, h, pad, hasNullify)
   pad = pad or 6
+  hasNullify = hasNullify or false
   local lineH = cfg.handPanel.fontSize
   local textY = y + pad
 
@@ -35,6 +58,17 @@ function Card.drawFace(card, x, y, w, h, pad)
     textY = textY + lineH
   end
 
+  -- On Discard effect (optional)
+  if card.onDiscard then
+    local discardEffect = card.onDiscard
+    local discardText = "On Discard: " .. discardEffect.type
+    if discardEffect.amount then
+      discardText = discardText .. " " .. discardEffect.amount
+    end
+    lg.printf(discardText, x + pad, textY, w - pad * 2, "center")
+    textY = textY + lineH
+  end
+
   -- Destructor effect (optional)
   if card.destructorEffect then
     local d = card.destructorEffect
@@ -42,10 +76,13 @@ function Card.drawFace(card, x, y, w, h, pad)
     if d.amount then
       amount = d.amount
     end
-    lg.printf("Destructor: " .. d.type .. " " .. amount, x + pad, textY, w - pad * 2, "center")
+    lg.printf("Destructor: " .. d.type .. " " .. amount, x + pad, textY + lineH, w - pad * 2, "center")
   end
 
   lg.setColor(1, 1, 1)
+  if hasNullify then
+    lg.setColor(cfg.colors.yellow)
+  end
   lg.rectangle("line", x, y, w, h)
 end
 
