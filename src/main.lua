@@ -47,7 +47,15 @@ function love.mousepressed(x, y, button)
 end
 
 function love.keypressed(key)
-  if CurrentScreen == "game" then
+  if CurrentScreen == "start" then
+    StartScreen.keypressed(key)
+  elseif CurrentScreen == "game" then
     GameLoop.keypressed(key)
+  end
+end
+
+function love.textinput(text)
+  if CurrentScreen == "start" then
+    StartScreen.textinput(text)
   end
 end

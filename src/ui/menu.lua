@@ -23,22 +23,6 @@ end
 function Menu.keypressed(key)
   if not Menu.isOpen then return false end
 
-  -- if Menu.page == "options" then
-  --   if key == "right" or key == "d" then
-  --     Menu.sel = (Menu.sel % #Display.presets) + 1
-  --     applyDisplay()
-  --   elseif key == "left" or key == "a" then
-  --     Menu.sel = ((Menu.sel - 2 + #Display.presets) % #Display.presets) + 1
-  --     applyDisplay()
-  --   elseif key == "f" then
-  --     Menu.wantFull = not Menu.wantFull
-  --     applyDisplay()
-  --   elseif key == "escape" or key == "m" then
-  --     Menu.page = "main"
-  --   end
-  --   return true
-  -- end
-
   if key == "escape" or key == "m" then
     Menu.toggle()
     return true

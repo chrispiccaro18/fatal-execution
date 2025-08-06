@@ -4,11 +4,14 @@ local Version = require("version")
 local GameState = require("game_state.index")
 local Click = require("ui.click")
 local OptionsMenu = require("ui.options_menu")
+local utf8 = require("utf8")
 
 local StartScreen = {}
 
 StartScreen.activeIndex = nil
-StartScreen.state = "loading" -- "loading", "menu", or "select"
+StartScreen.state = "loading" -- "loading", "menu", "select", or "name_entry"
+StartScreen.nameInput = ""
+StartScreen.nameProfileIndex = nil
 
 function StartScreen.load()
   local index = ActiveProfile.get()
@@ -66,6 +69,38 @@ function StartScreen.draw()
                         }, 18)
       end
     end
+  elseif StartScreen.state == "name_entry" then
+    lg.printf("Enter Profile Name:", 0, 80, W, "center")
+    local boxW, boxH = 400, 40
+    local boxX = (W - boxW) / 2
+    local boxY = 140
+
+    -- Draw input box
+    lg.setColor(0.2, 0.2, 0.2)
+    lg.rectangle("fill", boxX, boxY, boxW, boxH)
+    lg.setColor(1, 1, 1)
+    lg.rectangle("line", boxX, boxY, boxW, boxH)
+    lg.printf(StartScreen.nameInput, boxX + 10, boxY + 8, boxW - 20, "left")
+
+    local caretVisible = math.floor(love.timer.getTime() * 2) % 2 == 0
+    if caretVisible then
+      local font = lg.getFont()
+      local textWidth = font:getWidth(StartScreen.nameInput)
+      local caretX = boxX + 10 + textWidth + 1
+      local caretY = boxY + 8
+      lg.setColor(1, 1, 1)
+      lg.rectangle("fill", caretX, caretY, 2, font:getHeight())
+    end
+
+    -- Confirm button
+    local btnW, btnH = 120, 40
+    local btnX = (W - btnW) / 2
+    local btnY = boxY + 60
+    Click.addButton("confirm_name", { x = btnX, y = btnY, w = btnW, h = btnH }, "Confirm", {
+                      bg = { 0.2, 0.4, 0.2 },
+                      border = { 1, 1, 1 },
+                      text = { 1, 1, 1 }
+                    }, 20)
   elseif StartScreen.state == "menu" then
     local profile = Profiles.load(StartScreen.activeIndex)
 
@@ -115,11 +150,26 @@ function StartScreen.mousepressed(x, y, button)
     elseif hit.id:match("^profile_(%d+)$") then
       local index = tonumber(hit.id:match("%d+"))
       if not Profiles.profileExists(index) then
-        Profiles.rename(index, "Player " .. index)
+        StartScreen.state = "name_entry"
+        StartScreen.nameInput = ""
+        StartScreen.nameProfileIndex = index
+        return
       end
       StartScreen.activeIndex = index
       ActiveProfile.set(index)
       StartScreen.state = "menu"
+      return
+    end
+  elseif StartScreen.state == "name_entry" then
+    if hit.id == "confirm_name" then
+      local name = StartScreen.nameInput:match("^%s*(.-)%s*$")
+      if name ~= "" then
+        local index = StartScreen.nameProfileIndex
+        Profiles.rename(index, name)
+        StartScreen.activeIndex = index
+        ActiveProfile.set(index)
+        StartScreen.state = "menu"
+      end
       return
     end
   end
@@ -141,6 +191,35 @@ function StartScreen.mousepressed(x, y, button)
       StartScreen.state = "select"
     elseif hit.id == "quit" then
       love.event.quit()
+    end
+  end
+end
+
+function StartScreen.textinput(t)
+  if StartScreen.state == "name_entry" then
+    if #StartScreen.nameInput < 20 then
+      StartScreen.nameInput = StartScreen.nameInput .. t
+    end
+  end
+end
+
+function StartScreen.keypressed(key)
+  if StartScreen.state == "name_entry" then
+    if key == "backspace" then
+      local byteOffset = utf8.offset(StartScreen.nameInput, -1)
+      if byteOffset then
+        StartScreen.nameInput = string.sub(StartScreen.nameInput, 1, byteOffset - 1)
+      end
+    elseif key == "return" then
+      -- Same as clicking confirm
+      local name = StartScreen.nameInput:match("^%s*(.-)%s*$")
+      if name ~= "" then
+        local index = StartScreen.nameProfileIndex
+        Profiles.rename(index, name)
+        StartScreen.activeIndex = index
+        ActiveProfile.set(index)
+        StartScreen.state = "menu"
+      end
     end
   end
 end

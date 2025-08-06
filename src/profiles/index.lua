@@ -1,4 +1,4 @@
-local GameState = require("game_state.index")
+local defaultData = require("data")
 local Version = require("version")
 
 local Profiles = {}
@@ -8,22 +8,7 @@ local savePrefix = "profile_"
 local cachedProfiles = {}
 
 -- Default profile structure
-local defaultData = {
-  name = "New Profile",
-  settings = {
-    musicVolume = 0.8,
-    sfxVolume = 0.9,
-    showTooltips = true,
-    resolutionIndex = 1,
-    fullscreen = false,
-  },
-  progress = {
-    unlockedSystems = { "Power" },
-    endingsSeen = 0,
-  },
-  currentRun = nil,
-  gameVersion = Version.number,
-}
+local defaultProfile = defaultData.defaultProfile
 
 -- deep copy utility
 local function deepCopy(tbl)
@@ -37,7 +22,7 @@ end
 
 local function isValidCurrentRun(run)
   if type(run) ~= "table" then return false end
-  local expected = GameState.init()
+  local expected = defaultData.defaultGameState
 
   for k in pairs(run) do
     if expected[k] == nil then return false end
@@ -54,7 +39,7 @@ end
 
 
 local function validateAndMigrate(data, expected, isRoot)
-  expected = expected or defaultData
+  expected = expected or defaultProfile
   isRoot = isRoot ~= false
 
   local RECURSIVE_KEYS = {
@@ -146,13 +131,13 @@ function Profiles.load(index)
   local ok, chunk = pcall(love.filesystem.load, filename)
 
   if not ok or not chunk then
-    cachedProfiles[index] = deepCopy(defaultData)
+    cachedProfiles[index] = deepCopy(defaultProfile)
     return cachedProfiles[index]
   end
 
   local ok2, data = pcall(chunk)
   if not ok2 or type(data) ~= "table" then
-    cachedProfiles[index] = deepCopy(defaultData)
+    cachedProfiles[index] = deepCopy(defaultProfile)
     return cachedProfiles[index]
   end
 
