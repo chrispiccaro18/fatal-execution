@@ -1,11 +1,31 @@
+local Const = require("const")
 local Decorators = require("ui.decorators")
+
 local Systems = {}
 
 function Systems.init()
   return {
-    { name = "Power",     required = 3, progress = 0, envEffect = "Hand size increased by 1" },
-    { name = "Reactor",   required = 5, progress = 0, envEffect = "Gain 1 RAM at start of turn" },
-    { name = "Thrusters", required = 7, progress = 0, envEffect = "All effects doubled" }
+    {
+      name = "Power",
+      required = 3,
+      progress = 0,
+      activated = false,
+      envEffect = { type = Const.EFFECTS.MODIFY_HAND_SIZE, trigger = Const.EFFECTS_TRIGGERS.IMMEDIATE, amount = 1 }
+    },
+    {
+      name = "Reactor",
+      required = 5,
+      progress = 0,
+      activated = false,
+      envEffect = { type = Const.EFFECTS.GAIN_RAM, trigger = Const.EFFECTS_TRIGGERS.START_OF_TURN, amount = 1 }
+    },
+    {
+      name = "Thrusters",
+      required = 7,
+      progress = 0,
+      activated = false,
+      envEffect = { type = Const.EFFECTS.MULTIPLY_EFFECTS, multiplier = 2 }
+    }
   }
 end
 
@@ -33,6 +53,7 @@ function Systems.incrementProgress(systemList, currentSystemIndex, amount)
       name = sys.name,
       required = sys.required,
       progress = systemProgress,
+      activated = sys.activated,
       envEffect = sys.envEffect
     }
   end

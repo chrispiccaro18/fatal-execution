@@ -31,7 +31,6 @@ function LogsUI.drawLogs(rect)
   local lnH      = cfg.logsPanel.lnH
   local fontSize = cfg.logsPanel.fontSize
   local logs     = love.gameState.log
-  local env      = love.gameState.envEffect
 
   -- background
   lg.setColor(0, 0, 0, 0.50)
@@ -45,8 +44,6 @@ function LogsUI.drawLogs(rect)
   local x = rect.x + pad
   local y = rect.y + pad
   lg.setFont(lg.newFont(fontSize))
-  lg.printf("ENV EFFECT: " .. env, x, y, rect.w - pad * 2, "left")
-  y = y + lnH
   lg.printf("RECENT LOGS:", x, y, rect.w - pad * 2, "left")
   y = y + lnH
 

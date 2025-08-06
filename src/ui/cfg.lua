@@ -35,6 +35,12 @@ return {
     barH     = 30,
   },
 
+  effectsPanel    = {
+    pad = 8,
+    lnH = 14,
+    fontSize = 12,
+  },
+  
   logsPanel    = {
     pad = 8,
     lnH = 14,

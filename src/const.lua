@@ -11,4 +11,19 @@ Const.CARD_WIDTH          = 180
 Const.CARD_HEIGHT         = 270
 Const.CARD_SPACING_X      = 20
 
+Const.EFFECTS = {
+  MODIFY_HAND_SIZE = "modifyHandSize",
+  GAIN_RAM = "gainRAM",
+  MULTIPLY_EFFECTS = "multiplyEffects",
+  THREAT_TICK = "threatTick"
+}
+
+Const.EFFECTS_TRIGGERS = {
+  START_OF_TURN = "startOfTurn",
+  END_OF_TURN = "endOfTurn",
+  IMMEDIATE = "immediate",
+  ON_DRAW = "onDraw",
+  ON_PLAY = "onPlay"
+}
+
 return Const

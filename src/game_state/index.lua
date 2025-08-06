@@ -1,8 +1,12 @@
+local Const = require("const")
 local Deck = require("game_state.deck")
 local Hand = require("game_state.hand")
 local Systems = require("game_state.systems")
 local DestructorQueue = require("game_state.destructor_queue")
 local Threat = require("game_state.threat")
+local Log = require("game_state.log")
+
+local Effects = require("game_state.derived.effects")
 
 local EventSystem = require("events.index")
 local Decorators = require("ui.decorators")
@@ -25,7 +29,6 @@ function GameState.init()
     threat = Threat.init(),
     log = {},
     currentSystemIndex = 1,
-    envEffect = "No special effect.",
     uiTransitions = {},
   }
 end
@@ -51,15 +54,15 @@ function GameState.applyTransition(state, transition)
     if cardsToDraw then
       for _, drawnCard in ipairs(cardsToDraw) do
         table.insert(newState.hand, drawnCard)
-        newState = GameState.addLog(newState, "Drew card: " .. drawnCard.name)
+        newState = Log.addEntry(newState, "Drew card: " .. drawnCard.name)
       end
       newState.deck = newDeck
     end
 
     if not cardsToDraw or #cardsToDraw == 0 then
-      newState = GameState.addLog(newState, "Deck is empty, could not draw any cards.")
+      newState = Log.addEntry(newState, "Deck is empty, could not draw any cards.")
     elseif #cardsToDraw < requestedNumberOfCardsToDraw then
-      newState = GameState.addLog(newState, "Deck is empty, could not draw all cards.")
+      newState = Log.addEntry(newState, "Deck is empty, could not draw all cards.")
     end
   elseif transition.type == "discard" then
     local card = transition.payload.card
@@ -77,7 +80,6 @@ function GameState.applyTransition(state, transition)
       local discardEffect = card.onDiscard
       if discardEffect.type == "ram_multiplier" then
         newState.ram = newState.ram * discardEffect.amount
-        -- newState = GameState.addLog(newState, "RAM multiplier applied: " .. discardEffect.amount .. "x")
       end
     end
 
@@ -91,8 +93,6 @@ function GameState.applyTransition(state, transition)
     local newDeck = Deck.placeOnBottom(state.deck, card)
     newState.hand = newHand
     newState.deck = newDeck
-    -- newState.ram = state.ram - card.cost
-    -- newState = GameState.addLog(newState, "Played card: " .. card.name)
 
     if card.playEffect and card.playEffect.type == "progress" then
       newState.systems = Systems.incrementProgress(
@@ -122,26 +122,26 @@ function GameState.applyTransition(state, transition)
       if cardsToDraw then
         for _, drawnCard in ipairs(cardsToDraw) do
           table.insert(newState.hand, drawnCard)
-          newState = GameState.addLog(newState, "Drew card: " .. drawnCard.name)
+          newState = Log.addEntry(newState, "Drew card: " .. drawnCard.name)
         end
         newState.deck = newDeckAfterDraws
       end
 
       if not cardsToDraw or #cardsToDraw == 0 then
-        newState = GameState.addLog(newState, "Deck is empty, could not draw any cards.")
+        newState = Log.addEntry(newState, "Deck is empty, could not draw any cards.")
       elseif #cardsToDraw < card.playEffect.amount then
-        newState = GameState.addLog(newState, "Deck is empty, could not draw all requested cards.")
+        newState = Log.addEntry(newState, "Deck is empty, could not draw all requested cards.")
       end
     end
 
     if card.playEffect and card.playEffect.type == "nullify_destructor" then
       newState.destructorNullify = newState.destructorNullify + card.playEffect.amount
-      newState = GameState.addLog(newState, "Destructor nullified +1. Total: " .. newState.destructorNullify)
+      newState = Log.addEntry(newState, "Destructor nullified +1. Total: " .. newState.destructorNullify)
     end
 
     if GameState.checkWinCondition(newState) then
       newState.turn.phase = "won"
-      newState = GameState.addLog(newState, "== ALL SYSTEMS RESTORED ==")
+      newState = Log.addEntry(newState, "== ALL SYSTEMS RESTORED ==")
       EventSystem.emit("gameOver", "won")
     end
   elseif transition.type == "destructorPlay" then
@@ -155,15 +155,11 @@ function GameState.applyTransition(state, transition)
       -- emit nullify decorator
       Decorators.emit("cardShake", { cardId = card.name })
       newState.destructorNullify = newState.destructorNullify - 1
-      newState = GameState.addLog(newState, "Destructor nullified, no effect applied.")
-      newState.deck = Deck.placeOnBottom(newState.deck, card)
-      newState = GameState.beginTurn(newState)
-      return newState
-    end
+      newState = Log.addEntry(newState, "Destructor nullified, no effect applied.")
 
-    if card.destructorEffect.type == "threat" then
+    elseif card.destructorEffect.type == "threat" then
       newState.threat = Threat.increment(state.threat, amount)
-      newState = GameState.addLog(newState, "Destructor triggered: +" .. amount .. " threat.")
+      newState = Log.addEntry(newState, "Destructor triggered: +" .. amount .. " threat.")
       Decorators.emit("threatPulse")
     elseif card.destructorEffect.type == "progress" then
       newState.systems = Systems.incrementProgress(
@@ -171,25 +167,27 @@ function GameState.applyTransition(state, transition)
         state.currentSystemIndex,
         amount
       )
-      newState = GameState.addLog(newState, "Destructor triggered: " .. amount .. " progress.")
+      newState = Log.addEntry(newState, "Destructor triggered: " .. amount .. " progress.")
       newState = GameState.updateCurrentSystemIndex(newState)
     elseif card.destructorEffect.type == "draw_to_destructor" then
       local cardToDraw = transition.payload.cardToDestructor
       if not cardToDraw then
-        newState = GameState.addLog(newState, "Deck is empty, cannot draw a card to Destructor")
+        newState = Log.addEntry(newState, "Deck is empty, cannot draw a card to Destructor")
       else
         local newDeck = transition.payload.newDeckAfterDrawToDestructor
-        newState = GameState.addLog(newState, "Destructor triggered: " .. cardToDraw.name .. " added to Destructor.")
+        newState = Log.addEntry(newState, "Destructor triggered: " .. cardToDraw.name .. " added to Destructor.")
         newState.deck = newDeck
         newState.destructorQueue = DestructorQueue.enqueue(updatedQueue, cardToDraw)
       end
     elseif card.destructorEffect.type == "threat_multiplier" then
       newState.threat = Threat.set(state.threat, amount * state.threat.value)
-      newState = GameState.addLog(newState, "Destructor triggered: " .. amount .. "x threat multiplier applied.")
+      newState = Log.addEntry(newState, "Destructor triggered: " .. amount .. "x threat multiplier applied.")
       Decorators.emit("threatPulse")
     end
 
     newState.deck = Deck.placeOnBottom(newState.deck, card)
+
+    newState = Effects.resolveActiveEffects(newState, Const.EFFECTS_TRIGGERS.END_OF_TURN)
 
     newState = GameState.checkLossCondition(newState)
 
@@ -211,22 +209,25 @@ function GameState.updateCurrentSystemIndex(state)
   end
 
   if currentSystem.progress >= currentSystem.required then
+    -- Check if this system hasn’t been activated yet
+    if not currentSystem.activated then
+      -- currentSystem.activated = true
+      newState.systems[newState.currentSystemIndex].activated = true
+      newState = Effects.resolveActiveEffects(newState, Const.EFFECTS_TRIGGERS.IMMEDIATE)
+    end
+
+    -- Advance to next system if there is one
     if newState.currentSystemIndex < #newState.systems then
       newState.currentSystemIndex = newState.currentSystemIndex + 1
-      newState = GameState.addLog(newState,
-                                  "System " ..
-                                  currentSystem.name ..
-                                  " completed. Moving to " .. newState.systems[newState.currentSystemIndex].name .. ".")
-
-      local newEnvEffect = currentSystem.envEffect
-      newState.envEffect = newEnvEffect
-      if newEnvEffect == "Hand size increased by 1" then
-        newState.handSize = newState.handSize + 1
-      end
+      newState = Log.addEntry(newState,
+                                  "System " .. currentSystem.name .. " completed. Moving to " ..
+                                  newState.systems[newState.currentSystemIndex].name .. ".")
     end
+
     return newState
   end
 
+  -- Clamp negative progress to 0
   if currentSystem.progress < 0 then
     newState.systems[newState.currentSystemIndex].progress = 0
   end
@@ -239,12 +240,9 @@ function GameState.beginTurn(state)
   newState.turn.phase = "start"
 
   newState.ram = 0
-  if state.envEffect == "Gain 1 RAM at start of turn" then
-    newState.ram = newState.ram + 1
-    Decorators.emit("ramPulse", { amount = 1 })
-  end
+  newState = Effects.resolveActiveEffects(newState, Const.EFFECTS_TRIGGERS.START_OF_TURN)
   newState.turn.turnCount = newState.turn.turnCount + 1
-  newState = GameState.addLog(newState, "-- Turn " .. newState.turn.turnCount .. " begins --")
+  newState = Log.addEntry(newState, "-- Turn " .. newState.turn.turnCount .. " begins --")
 
   -- calculate how many cards to draw based on hand size
   local requestedNumberOfCardsToDraw = newState.handSize - #newState.hand
@@ -278,10 +276,10 @@ function GameState.endTurn(state)
   local destructorCard, updatedQueue = DestructorQueue.dequeue(state.destructorQueue)
 
   if not destructorCard then
-    newState = GameState.addLog(newState, "Destructor queue is empty :)")
+    newState = Log.addEntry(newState, "Destructor queue is empty :)")
     if state.destructorNullify > 0 then
       newState.destructorNullify = state.destructorNullify - 1
-      newState = GameState.addLog(newState, "Destructor nullified, but no card played.")
+      newState = Log.addEntry(newState, "Destructor nullified, but no card played.")
     end
     newState = GameState.beginTurn(newState)
     return newState
@@ -320,7 +318,7 @@ end
 
 function GameState.checkLossCondition(state)
   if state.threat.value >= state.threat.max then
-    state = GameState.addLog(state, "!! SYSTEM FAILURE: Threat Level Exceeded !!")
+    state = Log.addEntry(state, "!! SYSTEM FAILURE: Threat Level Exceeded !!")
     state.turn.phase = "lost"
     EventSystem.emit("gameOver", "lost")
   end
@@ -343,9 +341,9 @@ function GameState.discardCardForRam(state, index)
     if discardEffect.amount then
       discardText = discardText .. " " .. discardEffect.amount
     end
-    newState = GameState.addLog(newState, discardText)
+    newState = Log.addEntry(newState, discardText)
   else
-    newState = GameState.addLog(newState, "Discarded " .. card.name .. " for " .. card.cost .. " RAM.")
+    newState = Log.addEntry(newState, "Discarded " .. card.name .. " for " .. card.cost .. " RAM.")
   end
 
   return newState
@@ -356,16 +354,16 @@ function GameState.playCard(state, index)
   local card = state.hand[index]
 
   if card.noPlay then
-    newState = GameState.addLog(newState, "Cannot play " .. card.name .. ". Can only discard.")
+    newState = Log.addEntry(newState, "Cannot play " .. card.name .. ". Can only discard.")
     return newState
   end
 
   if state.ram < card.cost then
-    newState = GameState.addLog(newState, "Not enough RAM to play " .. card.name .. ".")
+    newState = Log.addEntry(newState, "Not enough RAM to play " .. card.name .. ".")
     return newState
   end
 
-  newState = GameState.addLog(newState, "Played card: " .. card.name)
+  newState = Log.addEntry(newState, "Played card: " .. card.name)
   newState.ram = newState.ram - card.cost
   Decorators.emit("ramPulse")
 
@@ -389,13 +387,6 @@ function GameState.playCard(state, index)
     newDeckAfterDraws = newDeckAfterDraws
   })
 
-  return newState
-end
-
-function GameState.addLog(state, entry)
-  local newState = GameState.shallowCopy(state)
-  table.insert(newState.log, entry)
-  Decorators.emit("logGlow", { message = entry })
   return newState
 end
 
