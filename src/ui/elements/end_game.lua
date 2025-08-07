@@ -1,15 +1,13 @@
 local cfg         = require("ui.cfg")
 local Display     = require("ui.display")
 local Click       = require("ui.click")
-local Profiles = require("profiles.index")
+local Profiles = require("profiles")
 local ActiveProfile = require("profiles.active")
 local GameState   = require("game_state.index")
 local EventSystem = require("events.index")
 local lg          = love.graphics
 
 local EndGameUI   = { isOpen = false }
-
-local activeProfileIndex = ActiveProfile.get()
 
 EventSystem.subscribe("gameOver", function(phase)
   EndGameUI.isOpen = true
@@ -97,6 +95,8 @@ function EndGameUI.mousepressed(px, py, button)
   local vx, vy = Display.toVirtual(px, py)
   local hit    = Click.hit(vx, vy)
   if not hit then return end
+
+  local activeProfileIndex = ActiveProfile.get()
 
   if hit.id == "play_again" then
     local restartState = GameState.init()

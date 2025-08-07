@@ -1,4 +1,6 @@
 local GameState = require("game_state.index")
+local Profiles = require("profiles")
+local RunLogger = require("profiles.run_logger")
 local Display = require("ui.display")
 local Click = require("ui.click")
 local Renderer = require("renderer")
@@ -9,8 +11,25 @@ local Decorators = require("ui.decorators")
 
 local GameLoop = {}
 
-function GameLoop.init(initialState)
-  love.gameState = initialState or GameState.beginTurn(GameState.init())
+function GameLoop.init(profileIndex, loadedGameState)
+  print("GameLoop.init called with profileIndex: " .. tostring(profileIndex))
+  if loadedGameState then
+    RunLogger.init(profileIndex, loadedGameState.seed)
+    love.gameState = loadedGameState
+    return
+  end
+
+  -- New game flow
+  local seed = os.time()
+  local newGameState = GameState.init(seed)
+
+  -- Hook into profile and run tracking
+  RunLogger.init(profileIndex, seed)
+  Profiles.clearCurrentRun(profileIndex)
+  Profiles.setCurrentRun(profileIndex, newGameState)
+
+  -- Advance to the first turn
+  love.gameState = GameState.beginTurn(newGameState)
 end
 
 function GameLoop.update(dt)
@@ -76,4 +95,3 @@ function GameLoop.keypressed(key)
 end
 
 return GameLoop
-

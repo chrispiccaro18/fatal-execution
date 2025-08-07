@@ -1,5 +1,5 @@
 local Const = require("const")
-local defaultData = require("data")
+-- local defaultData = require("data")
 local Deck = require("game_state.deck")
 local Hand = require("game_state.hand")
 local Systems = require("game_state.systems")
@@ -14,8 +14,8 @@ local Decorators = require("ui.decorators")
 
 local GameState = {}
 
-function GameState.init()
-  return defaultData.defaultGameState
+function GameState.init(seed)
+  return require("data.default_game_state").init(seed)
 end
 
 -- UI Transitions

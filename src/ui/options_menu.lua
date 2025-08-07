@@ -1,6 +1,6 @@
 local Click = require("ui.click")
 local Display = require("ui.display")
-local Profiles = require("profiles.index")
+local Profiles = require("profiles")
 local ActiveProfile = require("profiles.active")
 
 local OptionsMenu = {}

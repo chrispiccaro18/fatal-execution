@@ -2,9 +2,14 @@ local Deck = require("game_state.deck")
 local Hand = require("game_state.hand")
 local Systems = require("game_state.systems")
 local DestructorQueue = require("game_state.destructor_queue")
+local Version = require("version")
 local Threat = require("game_state.threat")
 
-local defaultGameState = {
+local DefaultGameState = {}
+
+function DefaultGameState.init(seed)
+  return {
+    seed = seed,
     deck = Deck.init(),
     hand = Hand.init(),
     handSize = 4,
@@ -20,6 +25,8 @@ local defaultGameState = {
     log = {},
     currentSystemIndex = 1,
     uiTransitions = {},
+    gameVersion = Version.number or "unknown",
   }
+end
 
-  return defaultGameState
+return DefaultGameState

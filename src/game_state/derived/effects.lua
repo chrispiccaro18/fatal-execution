@@ -33,7 +33,7 @@ function Effects.applyEffect(state, effect)
   if effect.type == Const.EFFECTS.MODIFY_HAND_SIZE then
     state.handSize = (state.handSize) + effect.amount
     state = Log.addEntry(state,
-      "Max hand size increased by " .. effect.amount .. " to " .. state.player.maxHandSize)
+      "Max hand size increased by " .. effect.amount .. " to " .. state.handSize)
   elseif effect.type == Const.EFFECTS.GAIN_RAM then
     state.ram = state.ram + effect.amount
     Decorators.emit("ramPulse")

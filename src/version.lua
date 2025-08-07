@@ -1,5 +1,5 @@
 local Version = {}
 
-Version.number = "0.1.0"
+Version.number = "0.1.1"
 
 return Version

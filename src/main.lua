@@ -1,5 +1,6 @@
 local StartScreen = require("ui.start_screen")
 local GameLoop = require("game_loop")
+local RunLogger = require("profiles.run_logger")
 local OptionsMenu = require("ui.options_menu")
 
 package.path = package.path
@@ -12,6 +13,7 @@ _G.CurrentScreen = "start"
 function love.load()
   love.graphics.setDefaultFilter("nearest", "nearest")
   math.randomseed(os.time())
+  RunLogger.load()
   StartScreen.load()
 end
 

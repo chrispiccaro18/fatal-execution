@@ -9,7 +9,7 @@ local defaultProfile = {
     unlockedSystems = { "Power" },
     endingsSeen = 0,
   },
-  currentRun = nil,
+  currentRun = false,
   gameVersion = Version.number,
 }
 
