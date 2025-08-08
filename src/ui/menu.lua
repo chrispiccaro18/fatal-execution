@@ -1,7 +1,7 @@
 local Const = require("const")
-local Display = require("ui.display")
-local Click = require("ui.click")
 local Profiles = require("profiles")
+local RunLogger = require("profiles.run_logger")
+local Click = require("ui.click")
 local ActiveProfile = require("profiles.active")
 local OptionsMenu = require("ui.options_menu")
 
@@ -87,11 +87,13 @@ function Menu.mousepressed(x, y, button)
   elseif hit.id == hitIds.OPTIONS then
     OptionsMenu.open(activeProfileIndex)
   elseif hit.id == hitIds.MAIN_MENU then
-    Profiles.setCurrentRun(activeProfileIndex, love.gameState)
+    -- Profiles.setCurrentRun(activeProfileIndex, love.gameState)
+    -- RunLogger.updateCurrent(love.gameState)
     Menu.toggle()
     CurrentScreen = Const.CURRENT_SCREEN.START
   elseif hit.id == hitIds.SAVE_QUIT then
-    Profiles.setCurrentRun(activeProfileIndex, love.gameState)
+    -- Profiles.setCurrentRun(activeProfileIndex, love.gameState)
+    -- RunLogger.updateCurrent(love.gameState)
     love.event.quit()
   elseif hit.id == hitIds.ABANDON then
     CurrentScreen = Const.CURRENT_SCREEN.START

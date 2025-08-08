@@ -27,7 +27,7 @@ function GameLoop.init(profileIndex, loadedGameState)
   -- Hook into profile and run tracking
   RunLogger.init(profileIndex, seed)
   Profiles.clearCurrentRun(profileIndex)
-  Profiles.setCurrentRun(profileIndex, newGameState)
+  -- Profiles.setCurrentRun(profileIndex, newGameState)
 
   -- Advance to the first turn
   love.gameState = GameState.beginTurn(newGameState)

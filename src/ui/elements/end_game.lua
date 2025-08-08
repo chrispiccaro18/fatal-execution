@@ -1,13 +1,14 @@
-local cfg         = require("ui.cfg")
-local Display     = require("ui.display")
-local Click       = require("ui.click")
-local Profiles = require("profiles")
+local cfg           = require("ui.cfg")
+local Display       = require("ui.display")
+local Click         = require("ui.click")
+local Profiles      = require("profiles")
+local RunLogger     = require("profiles.run_logger")
 local ActiveProfile = require("profiles.active")
-local GameState   = require("game_state.index")
-local EventSystem = require("events.index")
-local lg          = love.graphics
+local GameState     = require("game_state.index")
+local EventSystem   = require("events.index")
+local lg            = love.graphics
 
-local EndGameUI   = { isOpen = false }
+local EndGameUI     = { isOpen = false }
 
 EventSystem.subscribe("gameOver", function(phase)
   EndGameUI.isOpen = true
@@ -99,10 +100,12 @@ function EndGameUI.mousepressed(px, py, button)
   local activeProfileIndex = ActiveProfile.get()
 
   if hit.id == "play_again" then
-    local restartState = GameState.init()
-    Profiles.setCurrentRun(activeProfileIndex, restartState)
-    restartState = GameState.beginTurn(restartState)
+    local seed = os.time()
+    local restartState = GameState.init(seed)
+    RunLogger.init(activeProfileIndex, restartState.seed)
+    -- Profiles.setCurrentRun(activeProfileIndex, restartState)
     love.gameState = restartState
+    restartState = GameState.beginTurn(restartState)
     EndGameUI.isOpen = false
     Click.clear()
   elseif hit.id == "main_menu" then

@@ -1,11 +1,14 @@
 local Const = require("const")
--- local defaultData = require("data")
+local defaultGameState = require("data.default_game_state")
 local Deck = require("game_state.deck")
 local Hand = require("game_state.hand")
 local Systems = require("game_state.systems")
 local DestructorQueue = require("game_state.destructor_queue")
 local Threat = require("game_state.threat")
 local Log = require("game_state.log")
+local ActiveProfile = require("profiles.active")
+local Profiles = require("profiles")
+local RunLogger = require("profiles.run_logger")
 
 local Effects = require("game_state.derived.effects")
 
@@ -15,7 +18,7 @@ local Decorators = require("ui.decorators")
 local GameState = {}
 
 function GameState.init(seed)
-  return require("data.default_game_state").init(seed)
+  return defaultGameState.init(seed)
 end
 
 -- UI Transitions
@@ -221,8 +224,12 @@ function GameState.updateCurrentSystemIndex(state)
 end
 
 function GameState.beginTurn(state)
+  -- love.gameState = state
   local newState = GameState.shallowCopy(state)
   newState.turn.phase = "start"
+  -- SAVE HERE
+  Profiles.setCurrentRun(ActiveProfile.get(), newState)
+  RunLogger.updateCurrent(newState)
 
   newState.ram = 0
   newState = Effects.resolveActiveEffects(newState, Const.EFFECTS_TRIGGERS.START_OF_TURN)

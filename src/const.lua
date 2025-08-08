@@ -18,6 +18,14 @@ Const.START_SCREEN_STATES = {
   NAME_ENTRY = "name_entry",
 }
 
+Const.TURN_PHASES = {
+  START = "start",
+  IN_PROGRESS = "in_progress",
+  END_TURN = "end_turn",
+  WON = "won",
+  LOST = "lost",
+}
+
 Const.HIT_IDS             = {
   START_SCREEN = {
     CONTINUE = "continue",
