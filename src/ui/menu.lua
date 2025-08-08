@@ -1,3 +1,4 @@
+local Const = require("const")
 local Display = require("ui.display")
 local Click = require("ui.click")
 local Profiles = require("profiles")
@@ -10,9 +11,8 @@ local Menu = {
   wantFull = false,
 }
 
-local function applyDisplay()
-  Display.apply(Menu.sel, Menu.wantFull)
-end
+local hitIds = Const.HIT_IDS.IN_GAME_MENU
+local buttonLabels = Const.BUTTON_LABELS.IN_GAME_MENU
 
 function Menu.toggle()
   Menu.isOpen = not Menu.isOpen
@@ -54,11 +54,11 @@ function Menu.draw()
   }
 
   local buttons = {
-    { id = "continue", label = "Continue" },
-    { id = "options",  label = "Options" },
-    { id = "mainmenu", label = "Main Menu" },
-    { id = "savequit", label = "Save and Quit" },
-    { id = "abandon",  label = "Abandon Run" },
+    { id = hitIds.CONTINUE, label = buttonLabels.CONTINUE },
+    { id = hitIds.OPTIONS,  label = buttonLabels.OPTIONS },
+    { id = hitIds.MAIN_MENU, label = buttonLabels.MAIN_MENU },
+    { id = hitIds.SAVE_QUIT, label = buttonLabels.SAVE_QUIT },
+    { id = hitIds.ABANDON,  label = buttonLabels.ABANDON },
   }
 
   for i, b in ipairs(buttons) do
@@ -82,19 +82,19 @@ function Menu.mousepressed(x, y, button)
   local hit = Click.hit(x, y)
   if not hit then return end
 
-  if hit.id == "continue" then
+  if hit.id == hitIds.CONTINUE then
     Menu.toggle()
-  elseif hit.id == "options" then
-    OptionsMenu.open()
-  elseif hit.id == "mainmenu" then
+  elseif hit.id == hitIds.OPTIONS then
+    OptionsMenu.open(activeProfileIndex)
+  elseif hit.id == hitIds.MAIN_MENU then
     Profiles.setCurrentRun(activeProfileIndex, love.gameState)
     Menu.toggle()
-    CurrentScreen = "start"
-  elseif hit.id == "savequit" then
+    CurrentScreen = Const.CURRENT_SCREEN.START
+  elseif hit.id == hitIds.SAVE_QUIT then
     Profiles.setCurrentRun(activeProfileIndex, love.gameState)
     love.event.quit()
-  elseif hit.id == "abandon" then
-    CurrentScreen = "start"
+  elseif hit.id == hitIds.ABANDON then
+    CurrentScreen = Const.CURRENT_SCREEN.START
     Menu.toggle()
     Profiles.clearCurrentRun(activeProfileIndex)
   end

@@ -8,6 +8,7 @@ local Menu = require("ui.menu")
 local EndGameUI = require("ui.elements.end_game")
 local Animation = require("ui.animate")
 local Decorators = require("ui.decorators")
+local cfg = require("ui.cfg")
 
 local GameLoop = {}
 
@@ -42,7 +43,7 @@ function GameLoop.draw()
   local lg = love.graphics
 
   lg.setCanvas(Display.canvas)
-  lg.clear(0.07, 0.07, 0.07)
+  lg.clear(cfg.colors.almostBlack[1], cfg.colors.almostBlack[2], cfg.colors.almostBlack[3])
   Renderer.drawUI()
   Animation.draw()
   lg.setCanvas()
@@ -50,7 +51,7 @@ function GameLoop.draw()
   lg.push()
   lg.translate(Display.offsetX, Display.offsetY)
   lg.scale(Display.scale, Display.scale)
-  lg.setColor(1, 1, 1)
+  lg.setColor(cfg.colors.white)
   lg.draw(Display.canvas, 0, 0)
   lg.pop()
 

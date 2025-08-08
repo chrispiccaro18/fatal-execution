@@ -1,3 +1,4 @@
+local Const = require("const")
 local StartScreen = require("ui.start_screen")
 local GameLoop = require("game_loop")
 local RunLogger = require("profiles.run_logger")
@@ -8,7 +9,7 @@ package.path = package.path
     .. ";src/?/init.lua"
     .. ";src/?/?.lua"
 
-_G.CurrentScreen = "start"
+_G.CurrentScreen = Const.CURRENT_SCREEN.START
 
 function love.load()
   love.graphics.setDefaultFilter("nearest", "nearest")
@@ -18,17 +19,17 @@ function love.load()
 end
 
 function love.update(dt)
-  if CurrentScreen == "start" then
+  if CurrentScreen == Const.CURRENT_SCREEN.START then
     -- start screen doesn't need update yet
-  elseif CurrentScreen == "game" then
+  elseif CurrentScreen == Const.CURRENT_SCREEN.GAME then
     GameLoop.update(dt)
   end
 end
 
 function love.draw()
-  if CurrentScreen == "start" then
+  if CurrentScreen == Const.CURRENT_SCREEN.START then
     StartScreen.draw()
-  elseif CurrentScreen == "game" then
+  elseif CurrentScreen == Const.CURRENT_SCREEN.GAME then
     GameLoop.draw()
   end
 
@@ -41,23 +42,23 @@ function love.mousepressed(x, y, button)
     return
   end
 
-  if CurrentScreen == "start" then
+  if CurrentScreen == Const.CURRENT_SCREEN.START then
     StartScreen.mousepressed(x, y, button)
-  elseif CurrentScreen == "game" then
+  elseif CurrentScreen == Const.CURRENT_SCREEN.GAME then
     GameLoop.mousepressed(x, y, button)
   end
 end
 
 function love.keypressed(key)
-  if CurrentScreen == "start" then
+  if CurrentScreen == Const.CURRENT_SCREEN.START then
     StartScreen.keypressed(key)
-  elseif CurrentScreen == "game" then
+  elseif CurrentScreen == Const.CURRENT_SCREEN.GAME then
     GameLoop.keypressed(key)
   end
 end
 
 function love.textinput(text)
-  if CurrentScreen == "start" then
+  if CurrentScreen == Const.CURRENT_SCREEN.START then
     StartScreen.textinput(text)
   end
 end

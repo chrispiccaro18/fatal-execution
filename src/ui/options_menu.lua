@@ -1,25 +1,33 @@
+local Const = require("const")
 local Click = require("ui.click")
 local Display = require("ui.display")
 local Profiles = require("profiles")
-local ActiveProfile = require("profiles.active")
 
-local OptionsMenu = {}
-OptionsMenu.activeIndex = nil
-OptionsMenu.isOpen = false
+local OptionsMenu = {
+  activeIndex = nil,
+  isOpen = false,
+  profile = {},
+}
+
+local hitIds = Const.HIT_IDS.OPTIONS_MENU
+local buttonLabels = Const.BUTTON_LABELS.OPTIONS_MENU
+
 
 local function applyDisplay(resIndex, fullscreen)
   Display.apply(resIndex, fullscreen)
 end
 
-function OptionsMenu.open()
-  OptionsMenu.activeIndex = ActiveProfile.get()
+function OptionsMenu.open(profileIndex)
+  OptionsMenu.activeIndex = profileIndex
+  OptionsMenu.profile = Profiles.getCachedProfiles()[profileIndex]
   OptionsMenu.isOpen = true
 end
 
 function OptionsMenu.close()
-  OptionsMenu.isOpen = false
   Profiles.save(OptionsMenu.activeIndex)
+  OptionsMenu.isOpen = false
   OptionsMenu.activeIndex = nil
+  OptionsMenu.profile = {}
 end
 
 function OptionsMenu.draw()
@@ -30,51 +38,56 @@ function OptionsMenu.draw()
   lg.setFont(lg.newFont(22))
   Click.clear()
 
-  local profile = Profiles.load(OptionsMenu.activeIndex)
-  local settings = profile.settings
+  local settings = OptionsMenu.profile.settings
   local x = (W - 400) / 2
   local y = 100
   local spacing = 60
   local btnW, btnH = 400, 40
   local fontSize = 20
   local colors = {
-    bg = {0.2, 0.2, 0.2},
-    border = {1, 1, 1},
-    text = {1, 1, 1}
+    bg = { 0.2, 0.2, 0.2 },
+    border = { 1, 1, 1 },
+    text = { 1, 1, 1 }
   }
 
-  local function drawVolume(label, key)
-    local percent = math.floor(settings[key] * 100)
-    Click.addButton("vol_up_" .. key, {x = x, y = y, w = 40, h = btnH}, "+", colors, fontSize)
-    Click.addButton("vol_down_" .. key, {x = x + btnW - 40, y = y, w = 40, h = btnH}, "-", colors, fontSize)
-    Click.addButton("vol_label_" .. key, {x = x + 50, y = y, w = btnW - 100, h = btnH},
-      string.format("%s Volume: %d%%", label, percent), colors, fontSize)
+  local function drawVolumeControl(control)
+    local percent = math.ceil(settings[control.settingKey] * 100 / 5) * 5
+
+    Click.addButton(control.downId, { x = x, y = y, w = 40, h = btnH }, "-", colors, fontSize)
+    Click.addButton(control.upId, { x = x + btnW - 40, y = y, w = 40, h = btnH }, "+", colors, fontSize)
+
+    local labelText = string.format("%s: %d%%", buttonLabels[control.labelId], percent)
+    Click.addButton(control.labelHitId, {
+                      x = x + 50, y = y, w = btnW - 100, h = btnH
+                    }, labelText, colors, fontSize)
+
     y = y + spacing
   end
 
-  drawVolume("Music", "musicVolume")
-  drawVolume("SFX", "sfxVolume")
+  for _, control in ipairs(Const.VOLUME_CONTROLS) do
+    drawVolumeControl(control)
+  end
 
   -- Tooltip toggle
-  local tooltipText = settings.showTooltips and "Tooltips: ON" or "Tooltips: OFF"
-  Click.addButton("toggle_tooltips", {x = x, y = y, w = btnW, h = btnH}, tooltipText, colors, fontSize)
+  local tooltipText = settings.showTooltips and buttonLabels.TOOLTIPS_ENABLED or buttonLabels.TOOLTIPS_DISABLED
+  Click.addButton(hitIds.TOGGLE_TOOLTIPS, { x = x, y = y, w = btnW, h = btnH }, tooltipText, colors, fontSize)
   y = y + spacing
 
   -- Resolution
   local currentPreset = Display.presets[settings.resolutionIndex]
-  Click.addButton("res_left", {x = x, y = y, w = 40, h = btnH}, "<", colors, fontSize)
-  Click.addButton("res_label", {x = x + 50, y = y, w = btnW - 100, h = btnH},
-    string.format("Resolution: %dx%d", currentPreset.w, currentPreset.h), colors, fontSize)
-  Click.addButton("res_right", {x = x + btnW - 40, y = y, w = 40, h = btnH}, ">", colors, fontSize)
+  Click.addButton(hitIds.RES_LEFT, { x = x, y = y, w = 40, h = btnH }, "<", colors, fontSize)
+  Click.addButton(hitIds.RES_LABEL, { x = x + 50, y = y, w = btnW - 100, h = btnH },
+                  string.format(buttonLabels.RESOLUTION .. "%dx%d", currentPreset.w, currentPreset.h), colors, fontSize)
+  Click.addButton(hitIds.RES_RIGHT, { x = x + btnW - 40, y = y, w = 40, h = btnH }, ">", colors, fontSize)
   y = y + spacing
 
   -- Fullscreen toggle
-  local fsLabel = settings.fullscreen and "Fullscreen: ON" or "Fullscreen: OFF"
-  Click.addButton("toggle_fullscreen", {x = x, y = y, w = btnW, h = btnH}, fsLabel, colors, fontSize)
+  local fsLabel = settings.fullscreen and buttonLabels.FULLSCREEN_ENABLED or buttonLabels.FULLSCREEN_DISABLED
+  Click.addButton(hitIds.TOGGLE_FULLSCREEN, { x = x, y = y, w = btnW, h = btnH }, fsLabel, colors, fontSize)
   y = y + spacing
 
   -- Back
-  Click.addButton("options_back", {x = x, y = y, w = btnW, h = btnH}, "Back to Menu", colors, fontSize)
+  Click.addButton(hitIds.BACK, { x = x, y = y, w = btnW, h = btnH }, buttonLabels.BACK, colors, fontSize)
 end
 
 function OptionsMenu.mousepressed(x, y, button)
@@ -82,31 +95,30 @@ function OptionsMenu.mousepressed(x, y, button)
   local hit = Click.hit(x, y)
   if not hit then return end
 
-  local profile = Profiles.load(OptionsMenu.activeIndex)
-  local settings = profile.settings
+  local settings = OptionsMenu.profile.settings
 
-  if hit.id == "vol_up_musicVolume" then
+  if hit.id == hitIds.VOL_UP_music then
     settings.musicVolume = math.min(1.0, settings.musicVolume + 0.05)
-  elseif hit.id == "vol_down_musicVolume" then
+  elseif hit.id == hitIds.VOL_DOWN_music then
     settings.musicVolume = math.max(0.0, settings.musicVolume - 0.05)
-  elseif hit.id == "vol_up_sfxVolume" then
+  elseif hit.id == hitIds.VOL_UP_sfx then
     settings.sfxVolume = math.min(1.0, settings.sfxVolume + 0.05)
-  elseif hit.id == "vol_down_sfxVolume" then
+  elseif hit.id == hitIds.VOL_DOWN_sfx then
     settings.sfxVolume = math.max(0.0, settings.sfxVolume - 0.05)
-  elseif hit.id == "toggle_tooltips" then
+  elseif hit.id == hitIds.TOGGLE_TOOLTIPS then
     settings.showTooltips = not settings.showTooltips
-  elseif hit.id == "toggle_fullscreen" then
+  elseif hit.id == hitIds.TOGGLE_FULLSCREEN then
     settings.fullscreen = not settings.fullscreen
     applyDisplay(settings.resolutionIndex, settings.fullscreen)
-  elseif hit.id == "res_left" then
+  elseif hit.id == hitIds.RES_LEFT then
     local count = #Display.presets
     settings.resolutionIndex = ((settings.resolutionIndex - 2 + count) % count) + 1
     applyDisplay(settings.resolutionIndex, settings.fullscreen)
-  elseif hit.id == "res_right" then
+  elseif hit.id == hitIds.RES_RIGHT then
     local count = #Display.presets
     settings.resolutionIndex = (settings.resolutionIndex % count) + 1
     applyDisplay(settings.resolutionIndex, settings.fullscreen)
-  elseif hit.id == "options_back" then
+  elseif hit.id == hitIds.BACK then
     Profiles.save(OptionsMenu.activeIndex)
     OptionsMenu.close()
   end
