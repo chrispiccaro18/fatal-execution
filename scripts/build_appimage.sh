@@ -5,7 +5,7 @@ echo "📦 [AppImage] Building..."
 
 cd "$(dirname "$0")/.."
 
-VERSION=$(grep 'Version.number' src/version.lua | cut -d'"' -f2)
+VERSION=$(grep -E '^local VERSION_TAG' src/version.lua | cut -d'"' -f2)
 
 if [ ! -f build/tmp/fatal-exception.love ]; then
   echo "⚠️ build/tmp/fatal-exception.love not found. Run build_steam.sh first or generate it."

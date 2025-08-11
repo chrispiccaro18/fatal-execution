@@ -7,6 +7,10 @@ local colorDefaults = {
   green       = { 0, 1, 0 },
   yellow      = { 1, 1, 0 },
   red         = { 1, 0, 0 },
+  lightGray  = { 0.5, 0.5, 0.5 },
+  darkGray   = { 0.2, 0.2, 0.2 },
+  darkerGray = { 0.1, 0.1, 0.1 },
+  transparent = { 0, 0, 0, 0 },
   almostBlack = { 0.07, 0.07, 0.07 },
 }
 -- All numbers are *fractions* of window width / height unless noted otherwise

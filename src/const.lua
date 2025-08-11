@@ -1,8 +1,15 @@
 local Const               = {}
 
+Const.RNG_STREAMS = {
+  DECK_BUILD = "deck_build",
+  DRAWS = "draws",
+  DESTRUCTOR = "destructor",
+  GENERAL = "general",
+}
+
 -- Tile and scale settings
 Const.TILE_SIZE           = 32 -- source pixel size (per sprite)
-Const.SCALE               = 4 -- integer up‑scale factor
+Const.SCALE               = 4  -- integer up‑scale factor
 -- Compute draw size from TILE_SIZE and SCALE
 Const.DRAW_SIZE           = Const.TILE_SIZE * Const.SCALE
 
@@ -18,7 +25,7 @@ Const.START_SCREEN_STATES = {
   NAME_ENTRY = "name_entry",
 }
 
-Const.TURN_PHASES = {
+Const.TURN_PHASES         = {
   START = "start",
   IN_PROGRESS = "in_progress",
   END_TURN = "end_turn",
@@ -82,6 +89,112 @@ Const.BUTTON_LABELS       = {
     RESOLUTION = "Resolution: ",
     BACK = "Back to Menu",
   },
+}
+
+Const.CARDS = {
+  TREE_SHAKING = {
+    ID = "tree_shaking",
+    NAME = "Tree Shaking"
+  },
+  DANGLING_POINTER = {
+    ID = "dangling_pointer",
+    NAME = "Dangling Pointer"
+  },
+  GURU_MEDITATION = {
+    ID = "guru_meditation",
+    NAME = "Guru Meditation"
+  },
+  MEMORY_LEAK = {
+    ID = "memory_leak",
+    NAME = "Memory Leak"
+  },
+  OOPS = {
+    ID = "oops",
+    NAME = "Oops"
+  },
+  GARBAGE_COLLECTION = {
+    ID = "garbage_collection",
+    NAME = "Garbage Collection"
+  },
+  SYSTEM_SHUFFLE = {
+    ID = "system_shuffle",
+    NAME = "System Shuffle"
+  },
+  MEMORY_PROBE = {
+    ID = "memory_probe",
+    NAME = "Memory Probe"
+  },
+  ANOMALY_MASK = {
+    ID = "anomaly_mask",
+    NAME = "Anomaly Mask"
+  },
+  PULSE_SPIKE = {
+    ID = "pulse_spike",
+    NAME = "Pulse Spike"
+  }
+}
+
+Const.PLAY_EFFECT_TYPES = {
+  PROGRESS = "progress",
+  THREAT = "threat",
+  SHUFFLE_DISRUPTOR = "shuffle_disruptor",
+  DRAW = "draw",
+  NULLIFY_DESTRUCTOR = "nullify_destructor",
+  NONE = "none",
+}
+
+Const.DESTRUCTOR_EFFECT_TYPES = {
+  PROGRESS = "progress",
+  THREAT = "threat",
+  DRAW_TO_DESTRUCTOR = "draw_to_destructor",
+  THREAT_MULTIPLIER = "threat_multiplier",
+  NONE = "none",
+}
+
+Const.ON_DISCARD_EFFECT_TYPES = {
+  RAM_MULTIPLIER = "ram_multiplier",
+}
+
+Const.DECKS = {
+  STARTER = "starter_v1",
+}
+
+Const.DECK_SPEC = {
+  PRESET = "preset",
+  CUSTOM_LIST = "custom_list",
+  CUSTOM_POOL = "custom_pool",
+}
+
+Const.DESTRUCTOR_DECKS = {
+  EMPTY = "empty",
+}
+
+Const.SYSTEMS = {
+  POWER = {
+    ID = "power",
+    NAME = "Power"
+  },
+  REACTOR = {
+    ID = "reactor",
+    NAME = "Reactor"
+  },
+  THRUSTERS = {
+    ID = "thrusters",
+    NAME = "Thrusters"
+  }
+}
+
+Const.THREATS = {
+  IMPACT_IMMINENT = {
+    ID = "impact_imminent",
+    NAME = "Impact Imminent"
+  }
+}
+
+Const.SHIPS = {
+  BASE_SHIP = {
+    ID = "base_ship_v1",
+  }
 }
 
 Const.VOLUME_CONTROLS     = {

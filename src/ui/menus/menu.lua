@@ -3,7 +3,7 @@ local Profiles = require("profiles")
 local RunLogger = require("profiles.run_logger")
 local Click = require("ui.click")
 local ActiveProfile = require("profiles.active")
-local OptionsMenu = require("ui.options_menu")
+local OptionsMenu = require("ui.menus.options_menu")
 
 local Menu = {
   isOpen   = false,

@@ -19,12 +19,12 @@ end
 
 function OptionsMenu.open(profileIndex)
   OptionsMenu.activeIndex = profileIndex
-  OptionsMenu.profile = Profiles.getCachedProfiles()[profileIndex]
+  OptionsMenu.profile = Profiles.get(profileIndex)
   OptionsMenu.isOpen = true
 end
 
 function OptionsMenu.close()
-  Profiles.save(OptionsMenu.activeIndex)
+  Profiles.updateAllSettings(OptionsMenu.activeIndex, OptionsMenu.profile.settings)
   OptionsMenu.isOpen = false
   OptionsMenu.activeIndex = nil
   OptionsMenu.profile = {}
@@ -119,7 +119,6 @@ function OptionsMenu.mousepressed(x, y, button)
     settings.resolutionIndex = (settings.resolutionIndex % count) + 1
     applyDisplay(settings.resolutionIndex, settings.fullscreen)
   elseif hit.id == hitIds.BACK then
-    Profiles.save(OptionsMenu.activeIndex)
     OptionsMenu.close()
   end
 end

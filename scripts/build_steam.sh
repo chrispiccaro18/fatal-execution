@@ -5,7 +5,7 @@ echo "🔨 [Steam] Building Linux folder..."
 
 cd "$(dirname "$0")/.."
 
-VERSION=$(grep 'Version.number' src/version.lua | cut -d'"' -f2)
+VERSION=$(grep -E '^local VERSION_TAG' src/version.lua | cut -d'"' -f2)
 
 mkdir -p build/tmp
 mkdir -p build/steam_linux_v$VERSION

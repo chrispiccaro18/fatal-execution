@@ -1,86 +1,179 @@
-local ProfilesUtils = require("profiles.utils")
-local Version = require("version")
-local defaultProfile = require("data.default_profile")
+local deepcopy       = require("util.deepcopy")
+-- deepcopy options
+-- skipFns=true, skipUd=true, copyMeta=false
+local ProfilesUtils  = require("profiles.utils")
+local Factory        = require("profiles.factory")
+local Version        = require("version")
+local Validate       = require("schema.validate")
+local ProfileSchema  = require("schema.profile_spec")
+local ModelSchemas   = require("schema.model_spec")
 
-local Profiles = {}
+local Profiles       = {}
 
-local MAX_PROFILES = 3
-local savePrefix = "profile_"
+local MAX_PROFILES   = 3
+local savePrefix     = "profile_"
 local cachedProfiles = {}
 
-local function deepCopy(tbl)
-  if type(tbl) ~= "table" then return tbl end
-  local copy = {}
-  for k, v in pairs(tbl) do
-    copy[deepCopy(k)] = deepCopy(v)
-  end
-  return copy
-end
+local SAVE_DEBOUNCE  = 0.5
+local dirty          = {} -- [index] = true if there are unsaved changes
+local timers         = {} -- [index] = seconds remaining until save
 
+-- ---------- utils ----------
 local function getFilename(index)
   return savePrefix .. tostring(index) .. ".lua"
 end
 
---- Private: Access profile data safely (via cache)
-function Profiles._getProfileData(index)
-  assert(index >= 1 and index <= MAX_PROFILES, "Invalid profile index")
-  if not cachedProfiles[index] then
-    Profiles.load(index)
-  end
-  return cachedProfiles[index]
-end
-
-function Profiles.load(index)
-  print(string.format("[Profiles.load] Loading profile %d", index))
-  assert(index >= 1 and index <= MAX_PROFILES, "Invalid profile index")
-  if cachedProfiles[index] then return cachedProfiles[index] end
-
-  print("[Profiles.load] Profile not found in cache.", index)
-
+-- ---------- IO ----------
+local function loadSlot(index)
+  print("In loadSlot(index)", index)
+  print("full save file path", love.filesystem.getSaveDirectory(), getFilename(index))
   local filename = getFilename(index)
-  if not love.filesystem.getInfo(filename) then
+  local info = love.filesystem.getInfo(filename)
+  if not info then
     cachedProfiles[index] = nil
     return nil
   end
 
-  local ok, chunk = pcall(love.filesystem.load, filename)
-  if not ok or not chunk then
+  local okLoad, chunk = pcall(love.filesystem.load, filename)
+  if not okLoad or not chunk then
     cachedProfiles[index] = nil
     return nil
   end
 
-  local ok2, data = pcall(chunk)
-  if not ok2 or type(data) ~= "table" then
+  local okRun, data = pcall(chunk)
+  if not okRun or type(data) ~= "table" then
     cachedProfiles[index] = nil
     return nil
+  end
+
+  Version.warnIfMismatch(("profile slot %s"):format(index), data.gameVersion)
+
+  local okProf, errsProf = Validate.validate(data, ProfileSchema.ProfileSpec)
+  if not okProf then
+    print(("[profiles] slot %s: profile failed validation."):format(tostring(index)))
+    for _, e in ipairs(errsProf) do
+      print(("  - %s: expected %s, got %s"):format(e.path or "(root)", tostring(e.expected), tostring(e.got)))
+    end
+    -- Optional: try to patch common issues (e.g., missing currentRun)
+  end
+
+  -- Validate currentRun, and false it if invalid.
+  local run = data.currentRun
+  if run == nil then
+    -- Should never be nil; treat as error.
+    print(("[profiles] slot %s: currentRun was nil; setting to false."):format(tostring(index)))
+    data.currentRun = false
+  elseif run == false then
+    -- Explicitly no active run; nothing to validate.
+    print(("[profiles] slot %s: currentRun was false; nothing to validate."):format(tostring(index)))
+  elseif type(run) ~= "table" then
+    -- Unexpected type
+    print(("[profiles] slot %s: currentRun has invalid type %s; setting to false.")
+      :format(tostring(index), type(run)))
+    data.currentRun = false
+  else
+    local ok, errs = Validate.validate(run, ModelSchemas.ModelSpec)
+
+    -- Only try the deckSpec union check if we have the fields
+    local okDeckSpec, errsDeck = true, nil
+    if ok and run.runConfig and run.runConfig.deckSpec then
+      okDeckSpec, errsDeck = ModelSchemas.validateDeckSpecUnion(run.runConfig.deckSpec, Validate.validate)
+    end
+
+    if (not ok) or (not okDeckSpec) then
+      print(("[profiles] currentRun failed validation for slot %s; clearing it."):format(tostring(index)))
+      if errs then
+        for _, e in ipairs(errs) do
+          print(("  - %s: expected %s, got %s"):format(e.path or "(root)", tostring(e.expected), tostring(e.got)))
+        end
+      end
+      if errsDeck then
+        for _, e in ipairs(errsDeck) do
+          print(("  - %s: expected %s, got %s"):format(e.path or "(deckSpec)", tostring(e.expected), tostring(e.got)))
+        end
+      end
+      data.currentRun = false
+    end
   end
 
   cachedProfiles[index] = data
   return data
 end
 
-function Profiles.save(index)
+local function saveSlot(index)
   local data = cachedProfiles[index]
   if not data then return end
   local encoded = "return " .. ProfilesUtils.serialize(data)
   love.filesystem.write(getFilename(index), encoded)
 end
 
-function Profiles._markDirtyAndSave(index)
-  Profiles.save(index)
+-- ---------- cache-safe access ----------
+function Profiles._getProfileData(index)
+  assert(index >= 1 and index <= MAX_PROFILES, "Invalid profile index")
+  if not cachedProfiles[index] then
+    loadSlot(index)
+  end
+  return cachedProfiles[index]
 end
 
--- Creation & Deletion
-function Profiles.create(index)
+-- ---------- debounce helpers ----------
+function Profiles.touch(index)
+  -- Mark dirty and (re)start the timer
+  dirty[index]  = true
+  timers[index] = SAVE_DEBOUNCE
+end
+
+function Profiles.flush(index)
+  if dirty[index] then
+    saveSlot(index)
+    dirty[index]  = nil
+    timers[index] = nil
+  end
+end
+
+function Profiles.flushAll()
+  for i = 1, MAX_PROFILES do
+    if dirty[i] then
+      saveSlot(i)
+      dirty[i]  = nil
+      timers[i] = nil
+    end
+  end
+end
+
+-- ---------- lifecycle ----------
+function Profiles.init()
+  local summary = {}
+  for i = 1, MAX_PROFILES do
+    local data = loadSlot(i) -- may be nil if no file
+    summary[i] = { exists = data ~= nil }
+  end
+  return summary
+end
+
+function Profiles.update(dt)
+  local toCheck = {}
+  for i, remaining in pairs(timers) do
+    toCheck[i] = remaining
+  end
+  for i, remaining in pairs(toCheck) do
+    remaining = remaining - dt
+    if remaining <= 0 then
+      Profiles.flush(i)
+    else
+      timers[i] = remaining
+    end
+  end
+end
+
+-- ---------- create/delete ----------
+function Profiles.create(index, name)
   assert(index >= 1 and index <= MAX_PROFILES, "Invalid profile index")
   if Profiles.profileExists(index) then return false end
-
-  local newProfile = deepCopy(defaultProfile)
-  newProfile.name = "Profile " .. index
-  newProfile.gameVersion = Version.number
-
-  cachedProfiles[index] = newProfile
-  Profiles._markDirtyAndSave(index)
+  local fallbackName = "Profile " .. index
+  local p = Factory.newProfile({ name = name or fallbackName })
+  cachedProfiles[index] = p
+  saveSlot(index)
   return true
 end
 
@@ -89,141 +182,68 @@ function Profiles.delete(index)
   cachedProfiles[index] = nil
 end
 
--- Metadata
-function Profiles.profileExists(index)
-  return love.filesystem.getInfo(getFilename(index)) ~= nil
+-- ---------- metadata ----------
+function Profiles.getMaxProfiles() return MAX_PROFILES end
+function Profiles.profileExists(index) return love.filesystem.getInfo(getFilename(index)) ~= nil end
+function Profiles.getCachedProfiles() return cachedProfiles end
+function Profiles.get(index) return Profiles._getProfileData(index) end
+
+-- ---------- accessors ----------
+function Profiles.getSettings(i) return Profiles._getProfileData(i) and Profiles._getProfileData(i).settings end
+function Profiles.getProgress(i) return Profiles._getProfileData(i) and Profiles._getProfileData(i).progress end
+function Profiles.getCurrentRun(i) return Profiles._getProfileData(i) and Profiles._getProfileData(i).currentRun end
+function Profiles.getName(i) return Profiles._getProfileData(i) and Profiles._getProfileData(i).name end
+function Profiles.hasCurrentRun(i)
+  local run = Profiles.getCurrentRun(i)
+  return run and run ~= false
 end
 
-function Profiles.getMaxProfiles()
-  return MAX_PROFILES
-end
-
-function Profiles.getCachedProfiles()
-  for i = 1, MAX_PROFILES do
-    Profiles._getProfileData(i)
-  end
-  return cachedProfiles
-end
-
--- Accessors
-function Profiles.getSettings(index)
-  return Profiles._getProfileData(index).settings
-end
-
-function Profiles.getProgress(index)
-  return Profiles._getProfileData(index).progress
-end
-
-function Profiles.getCurrentRun(index)
-  return Profiles._getProfileData(index).currentRun
-end
-
-function Profiles.getName(index)
-  return Profiles._getProfileData(index).name
-end
-
--- Mutators
+-- ---------- mutators ----------
 function Profiles.setCurrentRun(index, gameState)
-  Profiles._getProfileData(index).currentRun = gameState
-  Profiles._markDirtyAndSave(index)
+  local p = Profiles._getProfileData(index)
+  assert(p, "Profile must exist to setCurrentRun")
+  p.currentRun = gameState
+  Profiles.touch(index)
 end
 
 function Profiles.clearCurrentRun(index)
-  love.gameState = nil
-  Profiles._getProfileData(index).currentRun = false
-  Profiles._markDirtyAndSave(index)
+  local p = Profiles._getProfileData(index)
+  assert(p, "Profile must exist to clearCurrentRun")
+  p.currentRun = false
+  saveSlot(index)
 end
 
 function Profiles.updateSetting(index, key, value)
-  Profiles._getProfileData(index).settings[key] = value
-  Profiles._markDirtyAndSave(index)
+  local p = Profiles._getProfileData(index)
+  assert(p, "Profile must exist to update setting")
+  p.settings[key] = value
+  saveSlot(index)
+end
+
+function Profiles.updateAllSettings(index, settings)
+  local p = Profiles._getProfileData(index)
+  assert(p, "Profile must exist to update all settings")
+  for k, v in pairs(settings) do
+    p.settings[k] = v
+  end
+  saveSlot(index)
 end
 
 function Profiles.unlockSystem(index, system)
-  local unlocked = Profiles._getProfileData(index).progress.unlockedSystems
-  for _, s in ipairs(unlocked) do
+  local p = Profiles._getProfileData(index)
+  assert(p, "Profile must exist to unlock system")
+  for _, s in ipairs(p.progress.unlockedSystems) do
     if s == system then return end
   end
-  table.insert(unlocked, system)
-  Profiles._markDirtyAndSave(index)
+  table.insert(p.progress.unlockedSystems, system)
+  saveSlot(index)
 end
 
 function Profiles.rename(index, newName)
-  Profiles._getProfileData(index).name = newName
-  Profiles._markDirtyAndSave(index)
+  local p = Profiles._getProfileData(index)
+  assert(p, "Profile must exist to rename")
+  p.name = newName
+  saveSlot(index)
 end
 
 return Profiles
-
--- local function isValidCurrentRun(run)
---   if type(run) ~= "table" then return false end
---   local expected = require("data.default_game_state").init("random_seed")
-
---   for k in pairs(run) do
---     if expected[k] == nil then return false end
---   end
-
---   for k, v in pairs(expected) do
---     if run[k] == nil or type(run[k]) ~= type(v) then
---       return false
---     end
---   end
-
---   return true
--- end
-
-
--- local function validateAndMigrate(data, expected, isRoot)
---   expected = expected or defaultProfile
---   isRoot = isRoot ~= false
-
---   local RECURSIVE_KEYS = {
---     settings = true,
---     progress = true,
---   }
-
---   local wasModified = false
-
---   if data.currentRun ~= nil and not isValidCurrentRun(data.currentRun) then
---     print("[validateAndMigrate] currentRun is invalid → setting to nil")
---     data.currentRun = nil
---     wasModified = true
---   end
-
---   for k, v in pairs(expected) do
---     if k ~= "currentRun" then
---       if data[k] == nil then
---         print(string.format("[validateAndMigrate] Missing field %s → adding default", k))
---         data[k] = deepCopy(v)
---         wasModified = true
---       elseif type(v) == "table" then
---         if type(data[k]) ~= "table" then
---           print(string.format("[validateAndMigrate] Field %s expected table, got %s → replacing with default", k,
---                               type(data[k])))
---           data[k] = deepCopy(v)
---           wasModified = true
---         else
---           -- Only recurse into *expected* nested structures
---           if RECURSIVE_KEYS[k] then
---             if validateAndMigrate(data[k], v, false) then
---               wasModified = true
---             end
---           end
---         end
---       elseif type(data[k]) == "table" then
---         print(string.format("[validateAndMigrate] Field %s expected non-table, got table → replacing with default", k))
---         data[k] = deepCopy(v)
---         wasModified = true
---       end
---     end
-
---     if isRoot and data.gameVersion ~= Version.number then
---       print(string.format("[validateAndMigrate] Updating gameVersion from %s to %s", tostring(data.gameVersion),
---                           tostring(Version.number)))
---       data.gameVersion = Version.number
---       wasModified = true
---     end
-
---     return wasModified
---   end
--- end

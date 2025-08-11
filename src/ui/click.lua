@@ -4,7 +4,7 @@ local Click = { list = {} }
 -- rect: {x,y,w,h}
 -- payload: any extra info you need later (card index, etc.)
 function Click.register(id, rect, payload)
-  table.insert(Click.list, {id=id, rect=rect, payload=payload})
+  table.insert(Click.list, { id = id, rect = rect, payload = payload })
 end
 
 -- call once per frame
@@ -15,7 +15,7 @@ end
 -- simple AABB
 local function inside(r, px, py)
   return px >= r.x and px <= r.x + r.w
-     and py >= r.y and py <= r.y + r.h
+      and py >= r.y and py <= r.y + r.h
 end
 
 -- iterate top-to-bottom so last drawn (top-most) wins
@@ -44,8 +44,7 @@ function Click.addButton(id, rect, label, colors, fontSize)
             rect.w, "center")
 
   -- register for hit-test
-  Click.register(id, rect)
+    Click.register(id, rect)
 end
-
 
 return Click

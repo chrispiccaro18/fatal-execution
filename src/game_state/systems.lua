@@ -1,63 +1,48 @@
-local Const = require("const")
-local Decorators = require("ui.decorators")
+local SystemDefs = require("data.systems")
 
 local Systems = {}
 
-function Systems.init()
-  return {
-    {
-      name = "Power",
-      required = 3,
-      progress = 0,
-      activated = false,
-      envEffect = { type = Const.EFFECTS.MODIFY_HAND_SIZE, trigger = Const.EFFECTS_TRIGGERS.IMMEDIATE, amount = 1 }
-    },
-    {
-      name = "Reactor",
-      required = 5,
-      progress = 0,
-      activated = false,
-      envEffect = { type = Const.EFFECTS.GAIN_RAM, trigger = Const.EFFECTS_TRIGGERS.START_OF_TURN, amount = 1 }
-    },
-    {
-      name = "Thrusters",
-      required = 7,
-      progress = 0,
-      activated = false,
-      envEffect = { type = Const.EFFECTS.MULTIPLY_EFFECTS, multiplier = 2 }
-    }
-  }
-end
+local function copy(t) local r={}; for k,v in pairs(t) do r[k]=v end; return r end
 
-function Systems.incrementProgress(systemList, currentSystemIndex, amount)
-  local newList = {}
-  for i, sys in ipairs(systemList) do
-    local systemProgress = sys.progress
-    if i == currentSystemIndex then
-      local delta = amount
-      systemProgress = sys.progress + amount
-      if systemProgress > sys.required then
-        systemProgress = sys.required
-        delta = sys.required - sys.progress
-      elseif systemProgress < 0 then
-        systemProgress = 0
-        delta = -sys.progress
-      end
-      -- Emit a decorator event for progress animation
-      Decorators.emit("systemProgress", {
-        systemIndex = i,
-        delta = delta
-      })
-    end
-    newList[i] = {
-      name = sys.name,
-      required = sys.required,
-      progress = systemProgress,
-      activated = sys.activated,
-      envEffect = sys.envEffect
+-- Realize from a list of {id=...} coming from the ship preset
+function Systems.initFromIds(systemRefs)
+  local realized = {}
+  for i,ref in ipairs(systemRefs or {}) do
+    local def = assert(SystemDefs[ref.id], "Unknown system id: "..tostring(ref.id))
+    realized[i] = {
+      id        = def.id,
+      name      = def.name,
+      required  = def.required,
+      progress  = 0,
+      activated = false,
+      envEffect = def.envEffect and copy(def.envEffect) or nil,
     }
   end
-  return newList
+  return realized
+end
+
+-- Same increment function you had, now pure and returning delta + completed
+function Systems.incrementProgress(systemList, currentSystemIndex, amount)
+  local newList, deltaUsed, completed = {}, 0, false
+  for i, sys in ipairs(systemList) do
+    if i ~= currentSystemIndex then
+      newList[i] = sys
+    else
+      local tgt = {
+        id=sys.id, name=sys.name, required=sys.required,
+        progress=sys.progress, activated=sys.activated, envEffect=sys.envEffect
+      }
+      local before = tgt.progress
+      local after  = before + amount
+      if after > tgt.required then after = tgt.required end
+      if after < 0             then after = 0 end
+      tgt.progress = after
+      deltaUsed = after - before
+      completed = (after >= tgt.required)
+      newList[i] = tgt
+    end
+  end
+  return newList, deltaUsed, completed
 end
 
 return Systems

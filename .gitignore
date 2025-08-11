@@ -1,3 +1,4 @@
 .vscode
 build
 static
+.last_build_version

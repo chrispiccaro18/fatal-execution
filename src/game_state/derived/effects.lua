@@ -1,87 +1,104 @@
 local Const = require("const")
-local Log = require("game_state.log")
-local Decorators = require("ui.decorators")
+local copy  = require("util.copy")
 
 local Effects = {}
 
-function Effects.resolveActiveEffects(state, trigger)
-  local effects = {}
+-- Collect active env effects by trigger (systems that are activated + threats with matching trigger)
+-- Returns a flat array of { source="Power", kind="system"|"threat", index=idx, effect=envEffect }
+function Effects.collectActive(state, trigger)
+  local out = {}
 
-  -- Collect system effects
-  for _, sys in ipairs(state.systems) do
+  -- Systems (activated only)
+  for i, sys in ipairs(state.systems or {}) do
     if sys.activated and sys.envEffect and sys.envEffect.trigger == trigger then
-      table.insert(effects, sys.envEffect)
+      out[#out+1] = { source = sys.name or sys.id, kind = "system", index = i, effect = sys.envEffect }
     end
   end
 
-  -- Collect threat effects
-  if state.threat.envEffect and state.threat.envEffect.trigger == trigger then
-    table.insert(effects, state.threat.envEffect)
+  -- Threats (plural)
+  for i, th in ipairs(state.threats or {}) do
+    if th.envEffect and th.envEffect.trigger == trigger then
+      out[#out+1] = { source = th.name or th.id, kind = "threat", index = i, effect = th.envEffect }
+    end
   end
 
-  -- Collect any card-based or temporary effects here
+  -- TODO: include temporary buffs/debuffs if you add them later (state.activeEffects)
 
-  -- Apply them
-  for _, effect in ipairs(effects) do
-    state = Effects.applyEffect(state, effect)
-  end
-
-  return state
+  return out
 end
 
-function Effects.applyEffect(state, effect)
+-- Apply ONE effect and return a new state + a tiny, UI-agnostic "note" for logging/UIs.
+-- The note is a structured description your TaskRunner can turn into Log/UI intents.
+function Effects.apply(state, effect, ctx)
+  -- ctx can include fields like {source="Power", kind="system"|"threat", index=1}
+  local s = copy(state)
+  local note = nil
+
   if effect.type == Const.EFFECTS.MODIFY_HAND_SIZE then
-    state.handSize = (state.handSize) + effect.amount
-    state = Log.addEntry(state,
-      "Max hand size increased by " .. effect.amount .. " to " .. state.handSize)
+    local before = s.handSize
+    s.handSize = (s.handSize or 0) + (effect.amount or 0)
+    note = { msg = ("Max hand size %+d → %d"):format(effect.amount or 0, s.handSize), tag="hand_size" }
+
   elseif effect.type == Const.EFFECTS.GAIN_RAM then
-    state.ram = state.ram + effect.amount
-    Decorators.emit("ramPulse")
-  -- elseif effect.type == Const.EFFECTS.MULTIPLY_EFFECTS then
-  --   state.effectMultiplier = effect.multiplier
+    local delta = effect.amount or 0
+    s.ram = (s.ram or 0) + delta
+    note = { msg = ("Gain %d RAM"):format(delta), tag="ram_gain", amount=delta }
+
   elseif effect.type == Const.EFFECTS.THREAT_TICK then
-    state.threat.value = state.threat.value + (effect.amount or 1)
-    state = Log.addEntry(state, "Threat ticks up by " .. (effect.amount or 1))
-    Decorators.emit("threatPulse")
-  end
-
-  return state
-end
-
-function Effects.getActiveEffects(state)
-  local active = {}
-
-  for _, sys in ipairs(state.systems) do
-    if sys.progress >= sys.required and sys.envEffect then
-      table.insert(active, {
-        source = sys.name,
-        effect = sys.envEffect
-      })
+    -- You choose which threat index to tick in the caller.
+    -- If ctx.kind=="threat" and ctx.index set, tick that threat, else default to 1.
+    local idx = (ctx and ctx.kind == "threat" and ctx.index) or 1
+    local th = s.threats and s.threats[idx]
+    if th then
+      local before = th.value or 0
+      local amt = effect.amount or 1
+      local after = before + amt
+      if after > th.max then after = th.max end
+      -- write back as a shallow update
+      local threats = {}
+      for i,t in ipairs(s.threats) do
+        if i ~= idx then threats[i] = t
+        else
+          threats[i] = { id=t.id, name=t.name, value=after, max=t.max, envEffect=t.envEffect }
+        end
+      end
+      s.threats = threats
+      note = { msg = ("Threat '%s' +%d (%d/%d)"):format(th.name or th.id, amt, after, th.max), tag="threat_tick", index=idx, amount=amt }
     end
+
+  elseif effect.type == Const.EFFECTS.MULTIPLY_EFFECTS then
+    -- Example hook: store a multiplier on state for the *next* resolution step.
+    -- Caller should decide how/when to consume this.
+    s.effectMultiplier = (s.effectMultiplier or 1) * (effect.multiplier or 1)
+    note = { msg = ("Effects x%d"):format(effect.multiplier or 1), tag="multiplier" }
+
+  else
+    -- Unknown/no-op effect types are allowed; return state unchanged.
+    note = { msg = "No-op effect: "..tostring(effect.type), tag="noop" }
   end
 
-  if state.threat and state.threat.envEffect then
-    table.insert(active, {
-      source = state.threat.name,
-      effect = state.threat.envEffect
-    })
+  -- Attach minimal context to note so the UI/logger knows source/trigger.
+  if note then
+    if ctx and ctx.source then note.source = ctx.source end
+    if ctx and ctx.kind   then note.kind   = ctx.kind   end
+    if ctx and ctx.index  then note.index  = ctx.index  end
   end
 
-  -- optional: include temporary effects
-  -- for _, eff in ipairs(state.activeEffects or {}) do ... end
-
-  return active
+  return s, note
 end
 
+-- Utility to pretty describe an effect (for tooltips/menus)
 function Effects.describe(effect)
   if effect.type == Const.EFFECTS.GAIN_RAM then
-    return "Gain " .. effect.amount .. " RAM at start of turn"
+    return "Gain "..(effect.amount or 0).." RAM at start of turn"
   elseif effect.type == Const.EFFECTS.THREAT_TICK then
-    return "Threat level +" .. (effect.amount or 1) .. " at end of turn"
+    return "Threat +"..(effect.amount or 1).." at end of turn"
   elseif effect.type == Const.EFFECTS.MODIFY_HAND_SIZE then
-    return "Max hand size +" .. effect.amount
+    return "Max hand size +"..(effect.amount or 0)
   elseif effect.type == Const.EFFECTS.MULTIPLY_EFFECTS then
-    return "All effects multiplied by " .. effect.multiplier
+    return "All effects x"..(effect.multiplier or 1)
+  else
+    return tostring(effect.type)
   end
 end
 
