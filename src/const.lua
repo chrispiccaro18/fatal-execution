@@ -278,4 +278,9 @@ Const.EFFECTS_TRIGGERS        = {
   ON_PLAY = "onPlay"
 }
 
+Const.END_TURN_BUTTON = {
+  ID = "endTurnButton",
+  LABEL = "END TURN",
+}
+
 return Const

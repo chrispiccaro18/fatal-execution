@@ -1,4 +1,4 @@
-local cfg                = require("ui.cfg")
+local cfg    = require("ui.cfg")
 
 local Layout = {}
 
@@ -52,30 +52,30 @@ local function relayout(w, h, sections)
     return r
   end
 
-  sections.first   = nextRow(cfg.systemsH)
-  sections.second  = nextRow(cfg.effectsH)
-  sections.third   = nextRow(cfg.playH)
-  sections.fourth  = nextRow(cfg.deckH)
+  sections.first      = nextRow(cfg.systemsH)
+  sections.second     = nextRow(cfg.effectsH)
+  sections.third      = nextRow(cfg.playH)
+  sections.fourth     = nextRow(cfg.deckH)
 
-  sections.systems = sections.first
-  sections.effects = sliceH(sections.second, "left", 0.5)
-  sections.logs    = sliceH(sections.second, "right", 0.5)
-  sections.play    = sections.third
-  sections.deck    = sliceH(sections.fourth, "left", 0.33)
-  sections.ram     = sliceH(sections.fourth, "center", 0.33)
+  sections.systems    = sections.first
+  sections.effects    = sliceH(sections.second, "left", 0.5)
+  sections.logs       = sliceH(sections.second, "right", 0.5)
+  sections.play       = sections.third
+  sections.deck       = sliceH(sections.fourth, "left", 0.33)
+  sections.ram        = sliceH(sections.fourth, "center", 0.33)
 
   -- RIGHT COLUMN
-  sections.right   = rect(leftW + g, 0, rightW, h)
+  sections.right      = rect(leftW + g, 0, rightW, h)
 
-  sections.threat = sliceV(sections.right, "top", 0.2)
+  sections.threats    = sliceV(sections.right, "top", 0.2)
   sections.destructor = sliceV(sections.right, "center", 0.5)
-  sections.endTurn = sliceV(sections.right, "bottom", 0.2)
+  sections.endTurn    = sliceV(sections.right, "bottom", 0.2)
 end
 
 function Layout.compute(W, H)
   local sections = {}
   relayout(W, H, sections)
-  return {sections = sections}
+  return { sections = sections }
 end
 
 return Layout

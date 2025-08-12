@@ -1,29 +1,9 @@
-local cfg = require("ui.cfg")
-local Decorators = require("ui.decorators")
-local lg  = love.graphics
+local cfg      = require("ui.cfg")
+local lg       = love.graphics
 
-local Card = {
-  shakeTimers = {}
-}
+local colors   = cfg.colors
 
-local SHAKE_DURATION = 0.3
-
-function Card.triggerShake(cardId)
-  Card.shakeTimers[cardId] = SHAKE_DURATION
-end
-
-function Card.update(dt)
-  for cardId, timer in pairs(Card.shakeTimers) do
-    timer = timer - dt
-    if timer <= 0 then
-      Card.shakeTimers[cardId] = nil
-    else
-      Card.shakeTimers[cardId] = timer
-    end
-  end
-end
-
-Decorators.register(Card.update)
+local Card = {}
 
 function Card.drawFace(card, x, y, w, h, pad, hasNullify)
   pad = pad or 6
@@ -31,19 +11,10 @@ function Card.drawFace(card, x, y, w, h, pad, hasNullify)
   local lineH = cfg.handPanel.fontSize
   local textY = y + pad
 
-    -- Apply shake offset if the card is shaking
-  local shakeOffset = 0
-  if Card.shakeTimers[card.name] then
-    local shakeProgress = Card.shakeTimers[card.name] / SHAKE_DURATION
-    shakeOffset = math.sin(love.timer.getTime() * 20) * 5 * shakeProgress
-  end
-
-  x = x + shakeOffset
-
-  lg.setColor(0.8, 0.8, 0.8)
+  lg.setColor(colors.cardFaceGray)
   lg.rectangle("fill", x, y, w, h)
 
-  lg.setColor(0, 0, 0)
+  lg.setColor(colors.black)
   lg.setFont(lg.newFont(lineH))
 
   -- Name
@@ -90,7 +61,7 @@ function Card.drawFace(card, x, y, w, h, pad, hasNullify)
 
   lg.setColor(1, 1, 1)
   if hasNullify then
-    lg.setColor(cfg.colors.yellow)
+    lg.setColor(colors.yellow)
   end
   lg.rectangle("line", x, y, w, h)
 end

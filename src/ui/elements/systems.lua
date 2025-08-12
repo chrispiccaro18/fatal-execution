@@ -2,6 +2,7 @@ local cfg = require("ui.cfg")
 local lg  = love.graphics
 
 local colors = cfg.colors
+local fonts  = cfg.fonts
 
 local SystemsUI = {}
 
@@ -36,7 +37,7 @@ function SystemsUI.drawSystemsPanel(panelRect, systems, currentIndex)
     local r = boxes[i]
 
     -- bg
-    lg.setColor(0, 0, 0)
+    lg.setColor(colors.black)
     lg.rectangle("fill", r.x, r.y, r.w, r.h)
 
     -- border: white if current
@@ -44,7 +45,7 @@ function SystemsUI.drawSystemsPanel(panelRect, systems, currentIndex)
     lg.rectangle("line", r.x, r.y, r.w, r.h)
 
     -- name
-    lg.setFont(lg.newFont(14))  -- tip: cache fonts; don’t newFont() every frame
+    lg.setFont(fonts.big)
     lg.printf(sys.name or ("System " .. i), r.x, r.y + 10, r.w, "center")
   end
 
@@ -54,7 +55,7 @@ function SystemsUI.drawSystemsPanel(panelRect, systems, currentIndex)
     local sectionW = bar.w / math.max(1, currSys.required)
 
     -- bg
-    lg.setColor(0, 0, 0)
+    lg.setColor(colors.black)
     lg.rectangle("fill", bar.x, bar.y, bar.w, bar.h)
 
     -- filled sections
@@ -68,7 +69,7 @@ function SystemsUI.drawSystemsPanel(panelRect, systems, currentIndex)
     end
 
     -- dividers + border
-    lg.setColor(1, 1, 1)
+    lg.setColor(colors.white)
     for i = 1, currSys.required - 1 do
       local x = bar.x + i * sectionW
       lg.line(x, bar.y, x, bar.y + bar.h)

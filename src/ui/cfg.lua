@@ -1,22 +1,32 @@
 local Const         = require("const")
 
+local fonts         = {
+  default = love.graphics.newFont(14),
+  big     = love.graphics.newFont(18),
+  xLarge  = love.graphics.newFont(22),
+}
+
 local colorDefaults = {
-  black       = { 0, 0, 0 },
-  white       = { 1, 1, 1 },
-  blue        = { 0, 0.4, 1 },
-  green       = { 0, 1, 0 },
-  yellow      = { 1, 1, 0 },
-  red         = { 1, 0, 0 },
-  lightGray  = { 0.5, 0.5, 0.5 },
-  darkGray   = { 0.2, 0.2, 0.2 },
-  darkerGray = { 0.1, 0.1, 0.1 },
-  transparent = { 0, 0, 0, 0 },
-  almostBlack = { 0.07, 0.07, 0.07 },
+  black        = { 0, 0, 0 },
+  white        = { 1, 1, 1 },
+  blue         = { 0, 0.4, 1 },
+  green        = { 0, 1, 0 },
+  lightGreen   = { 0.6, 1, 0.6 },
+  darkGreen    = { 0, 0.6, 0.1 },
+  yellow       = { 1, 1, 0 },
+  red          = { 1, 0, 0 },
+  cardFaceGray = { 0.8, 0.8, 0.8 },
+  lightGray    = { 0.5, 0.5, 0.5 },
+  darkGray     = { 0.2, 0.2, 0.2 },
+  darkerGray   = { 0.1, 0.1, 0.1 },
+  transparent  = { 0, 0, 0, 0 },
+  almostBlack  = { 0.07, 0.07, 0.07 },
 }
 -- All numbers are *fractions* of window width / height unless noted otherwise
 return {
   -- Colors (RGBA 0-1)
   colors          = colorDefaults,
+  fonts           = fonts,
 
   -- Global gutters & stroke
   gutter          = 2,
@@ -71,9 +81,9 @@ return {
     labelFontSize = 16,
   },
 
-  threatPanel     = {
-    pad      = 10,
-    fontSize = 16,
+  threatsPanel    = {
+    pad  = 10,
+    font = fonts.big,
   },
 
   handPanel       = {
@@ -86,7 +96,7 @@ return {
 
   destructorPanel = {
     pad                = 10,
-    fontSize           = 12,
+    font               = fonts.big,
     cardW              = Const.CARD_WIDTH,
     cardH              = Const.CARD_HEIGHT,
     displayCardOffsetX = -10,
