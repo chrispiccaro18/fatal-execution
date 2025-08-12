@@ -28,7 +28,7 @@ function LogsUI.drawLogs(panel, allLogs)
   y = y + lnH
 
   local visibleLogs = Log.visible(allLogs)
-  for i = math.max(1, #visibleLogs - 10), #visibleLogs do
+  for i = math.max(1, #visibleLogs - 9), #visibleLogs do
     local log = visibleLogs[i]
     local msg = log.message
     lg.printf(msg, x, y, panel.w - pad * 2, "left")

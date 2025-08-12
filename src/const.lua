@@ -28,6 +28,9 @@ Const.START_SCREEN_STATES     = {
 Const.DISPATCH_ACTIONS        = {
   BEGIN_TURN = "begin_turn",
   DRAW_CARD = "draw_card",
+  DISCARD_CARD = "discard_card",
+  PLAY_CARD = "play_card",
+  END_TURN = "end_turn",
 }
 
 Const.UI                      = {
