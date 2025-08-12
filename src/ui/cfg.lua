@@ -42,6 +42,7 @@ return {
     boxW     = 120, -- fallback when the panel is very wide
     boxH     = 40,
     spacingX = 10,
+    spacingY = 0,
     barH     = 30,
   },
 

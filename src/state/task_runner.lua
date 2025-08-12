@@ -8,7 +8,7 @@ local function step_begin_turn(model, view, task, produced, ui)
   if task.pc == 1 then
     model.ram = 0
     model.turn.turnCount = model.turn.turnCount + 1
-    Log.addEntry(model, "-- Turn " .. model.turn.turnCount .. " begins --")
+    Log.add(model, "-- Turn " .. model.turn.turnCount .. " begins --")
     task.pc = 2
 
   elseif task.pc == 2 then

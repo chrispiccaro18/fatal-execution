@@ -1,6 +1,6 @@
-local Const               = {}
+local Const                   = {}
 
-Const.RNG_STREAMS = {
+Const.RNG_STREAMS             = {
   DECK_BUILD = "deck_build",
   DRAWS = "draws",
   DESTRUCTOR = "destructor",
@@ -8,24 +8,42 @@ Const.RNG_STREAMS = {
 }
 
 -- Tile and scale settings
-Const.TILE_SIZE           = 32 -- source pixel size (per sprite)
-Const.SCALE               = 4  -- integer up‑scale factor
+Const.TILE_SIZE               = 32 -- source pixel size (per sprite)
+Const.SCALE                   = 4  -- integer up‑scale factor
 -- Compute draw size from TILE_SIZE and SCALE
-Const.DRAW_SIZE           = Const.TILE_SIZE * Const.SCALE
+Const.DRAW_SIZE               = Const.TILE_SIZE * Const.SCALE
 
-Const.CURRENT_SCREEN      = {
+Const.CURRENT_SCREEN          = {
   START = "start",
   GAME  = "game",
 }
 
-Const.START_SCREEN_STATES = {
+Const.START_SCREEN_STATES     = {
   LOADING    = "loading",
   MENU       = "menu",
   SELECT     = "select",
   NAME_ENTRY = "name_entry",
 }
 
-Const.TURN_PHASES         = {
+Const.DISPATCH_ACTIONS        = {
+  BEGIN_TURN = "begin_turn",
+  DRAW_CARD = "draw_card",
+}
+
+Const.UI                      = {
+  ANIM = {
+    DRAW_INTERVAL = 0.12, -- spacing between successive draws
+    DRAW_TIME = 0.18      -- time to draw a single card
+  },
+  INTENTS = {
+    HAND_FILL_BEGIN = "hand_fill_begin",
+    HAND_FILL_END = "hand_fill_end",
+    ANIMATE_DRAW_CARD = "animate_draw_card",
+  }
+}
+
+Const.TURN_PHASES             = {
+  BEGIN_FIRST_TURN = "begin_first_turn",
   START = "start",
   IN_PROGRESS = "in_progress",
   END_TURN = "end_turn",
@@ -33,7 +51,7 @@ Const.TURN_PHASES         = {
   LOST = "lost",
 }
 
-Const.HIT_IDS             = {
+Const.HIT_IDS                 = {
   START_SCREEN = {
     CONTINUE = "continue",
     NEW      = "new",
@@ -64,7 +82,7 @@ Const.HIT_IDS             = {
   },
 }
 
-Const.BUTTON_LABELS       = {
+Const.BUTTON_LABELS           = {
   START_SCREEN = {
     CONTINUE = "Continue",
     NEW      = "New Run",
@@ -91,7 +109,12 @@ Const.BUTTON_LABELS       = {
   },
 }
 
-Const.CARDS = {
+Const.CARD_STATES             = {
+  IDLE = "idle",
+  ANIMATING = "animating",
+}
+
+Const.CARDS                   = {
   TREE_SHAKING = {
     ID = "tree_shaking",
     NAME = "Tree Shaking"
@@ -134,7 +157,12 @@ Const.CARDS = {
   }
 }
 
-Const.PLAY_EFFECT_TYPES = {
+Const.PLAY_EFFECT_KINDS       = {
+  SYSTEM = "system",
+  THREAT = "threat",
+}
+
+Const.PLAY_EFFECT_TYPES       = {
   PROGRESS = "progress",
   THREAT = "threat",
   SHUFFLE_DISRUPTOR = "shuffle_disruptor",
@@ -155,21 +183,21 @@ Const.ON_DISCARD_EFFECT_TYPES = {
   RAM_MULTIPLIER = "ram_multiplier",
 }
 
-Const.DECKS = {
+Const.DECKS                   = {
   STARTER = "starter_v1",
 }
 
-Const.DECK_SPEC = {
+Const.DECK_SPEC               = {
   PRESET = "preset",
   CUSTOM_LIST = "custom_list",
   CUSTOM_POOL = "custom_pool",
 }
 
-Const.DESTRUCTOR_DECKS = {
+Const.DESTRUCTOR_DECKS        = {
   EMPTY = "empty",
 }
 
-Const.SYSTEMS = {
+Const.SYSTEMS                 = {
   POWER = {
     ID = "power",
     NAME = "Power"
@@ -184,20 +212,34 @@ Const.SYSTEMS = {
   }
 }
 
-Const.THREATS = {
+Const.THREATS                 = {
   IMPACT_IMMINENT = {
     ID = "impact_imminent",
     NAME = "Impact Imminent"
   }
 }
 
-Const.SHIPS = {
+Const.SHIPS                   = {
   BASE_SHIP = {
     ID = "base_ship_v1",
   }
 }
 
-Const.VOLUME_CONTROLS     = {
+Const.LOG                     =
+{
+  SEVERITY = {
+    INFO  = "info",
+    WARN  = "warn",
+    ERROR = "error",
+    DEBUG = "debug",
+
+  },
+  CATEGORY = {
+    GENERAL = "general",
+  }
+}
+
+Const.VOLUME_CONTROLS         = {
   {
     key = "music",
     settingKey = "musicVolume",
@@ -217,18 +259,18 @@ Const.VOLUME_CONTROLS     = {
 }
 
 -- UI positions and dimensions
-Const.CARD_WIDTH          = 180
-Const.CARD_HEIGHT         = 270
-Const.CARD_SPACING_X      = 20
+Const.CARD_WIDTH              = 180
+Const.CARD_HEIGHT             = 270
+Const.CARD_SPACING_X          = 20
 
-Const.EFFECTS             = {
+Const.EFFECTS                 = {
   MODIFY_HAND_SIZE = "modifyHandSize",
   GAIN_RAM = "gainRAM",
   MULTIPLY_EFFECTS = "multiplyEffects",
   THREAT_TICK = "threatTick"
 }
 
-Const.EFFECTS_TRIGGERS    = {
+Const.EFFECTS_TRIGGERS        = {
   START_OF_TURN = "startOfTurn",
   END_OF_TURN = "endOfTurn",
   IMMEDIATE = "immediate",

@@ -18,9 +18,16 @@ end
 
 local function normalizeSettings(s)
   if type(s) ~= "table" then
+    print("[profiles/factory] invalid settings; using defaults")
     return deepcopy(defaultSettings, nil, { copyMeta = false })
   end
   local out = deepcopy(s, nil, { copyMeta = false })
+
+  if not out then
+    print("[profiles/factory] invalid settings; using defaults")
+    return deepcopy(defaultSettings, nil, { copyMeta = false })
+  end
+
   out.musicVolume     = clamp01(out.musicVolume ~= nil and out.musicVolume or defaultSettings.musicVolume)
   out.sfxVolume       = clamp01(out.sfxVolume   ~= nil and out.sfxVolume   or defaultSettings.sfxVolume)
   out.showTooltips    = not not (out.showTooltips ~= nil and out.showTooltips or defaultSettings.showTooltips)
@@ -35,6 +42,11 @@ function Factory.newProfile(opts)
   opts = opts or {}
 
   local p = deepcopy(defaultProfile, nil, { copyMeta = false })
+
+  if not p then
+    assert(false, "[profiles/factory] failed to create profile")
+    return
+  end
 
   -- Never allow nil here; your invariant is false | table
   if p.currentRun == nil then p.currentRun = false end

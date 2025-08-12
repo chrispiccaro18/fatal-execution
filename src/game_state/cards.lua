@@ -1,8 +1,10 @@
 -- Runtime helpers for creating instances from the registry.
 -- Adds transient UI fields. Provides hydrate/strip helpers.
+Const = require("const")
 local Registry = require("data.cards")
 
 local Cards = {}
+local IDLE = Const.CARD_STATES.IDLE
 
 -- shallow copy (enough for our flat defs)
 local function copy(t)
@@ -26,7 +28,7 @@ function Cards.instantiate(id, onlyId)
   local c = copy(def)
 
   -- Transient/UI fields (these are safe to serialize, but you can strip them on save if you prefer)
-  c.state      = "idle"      -- "idle", "animating", etc.
+  c.state      = IDLE
   c.pos        = nil         -- UI coords if needed
   c.animX      = nil
   c.animY      = nil
@@ -40,7 +42,7 @@ end
 function Cards.hydrateMin(cardMin)
   local def = assert(Registry[cardMin.id], "Unknown card id: "..tostring(cardMin.id))
   local c = copy(def)
-  c.state, c.selectable, c.pos, c.animX, c.animY = "idle", false, nil, nil, nil
+  c.state, c.selectable, c.pos, c.animX, c.animY = IDLE, false, nil, nil, nil
   return c
 end
 

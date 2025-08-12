@@ -1,13 +1,10 @@
+local Const = require("const")
 local copy = require("util.copy")
 
 local Log = {}
 
-Log.SEVERITY = {
-  INFO    = "info",
-  WARN    = "warn",
-  ERROR   = "error",
-  DEBUG   = "debug",
-}
+Log.SEVERITY = Const.LOG.SEVERITY
+Log.CATEGORY = Const.LOG.CATEGORY
 
 -- -- In TaskRunner when a card is played
 -- local Log = require("game_state.log")
@@ -55,7 +52,7 @@ function Log.add(state, entry, opts)
 
   -- opts override entry fields (if provided)
   msg = opts.message  or msg
-  cat = opts.category or cat or "general"
+  cat = opts.category or cat or Log.CATEGORY.GENERAL
   sev = opts.severity or sev or Log.SEVERITY.INFO
   vis = (opts.visible ~= nil) and opts.visible or (vis ~= nil and vis or true)
   data = opts.data or data

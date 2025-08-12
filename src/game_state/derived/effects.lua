@@ -11,14 +11,14 @@ function Effects.collectActive(state, trigger)
   -- Systems (activated only)
   for i, sys in ipairs(state.systems or {}) do
     if sys.activated and sys.envEffect and sys.envEffect.trigger == trigger then
-      out[#out+1] = { source = sys.name or sys.id, kind = "system", index = i, effect = sys.envEffect }
+      out[#out+1] = { source = sys.name or sys.id, kind = Const.PLAY_EFFECT_KINDS.SYSTEM, index = i, effect = sys.envEffect }
     end
   end
 
   -- Threats (plural)
   for i, th in ipairs(state.threats or {}) do
     if th.envEffect and th.envEffect.trigger == trigger then
-      out[#out+1] = { source = th.name or th.id, kind = "threat", index = i, effect = th.envEffect }
+      out[#out+1] = { source = th.name or th.id, kind = Const.PLAY_EFFECT_KINDS.THREAT, index = i, effect = th.envEffect }
     end
   end
 
@@ -47,7 +47,7 @@ function Effects.apply(state, effect, ctx)
   elseif effect.type == Const.EFFECTS.THREAT_TICK then
     -- You choose which threat index to tick in the caller.
     -- If ctx.kind=="threat" and ctx.index set, tick that threat, else default to 1.
-    local idx = (ctx and ctx.kind == "threat" and ctx.index) or 1
+    local idx = (ctx and ctx.kind == Const.PLAY_EFFECT_KINDS.THREAT and ctx.index) or 1
     local th = s.threats and s.threats[idx]
     if th then
       local before = th.value or 0

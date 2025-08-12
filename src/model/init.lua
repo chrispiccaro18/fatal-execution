@@ -30,14 +30,14 @@ local function deriveStreams(seed)
 end
 
 --- Create a new authoritative game model
--- @param seed (number) master seed for deterministic runs
--- @param runConfigOpts (table) player-chosen presets/settings
+-- @param seed (number or nil) master seed for deterministic runs
+-- @param runConfigOpts (table or nil) player-chosen presets/settings
 function Model.new(seed, runConfigOpts)
   seed = seed or os.time()
 
 
   -- Explicit run configuration (player choices)
-  local runConfig      = MakeRunConfig(runConfigOpts or {})
+  local runConfig      = MakeRunConfig(runConfigOpts)
 
   local shipId         = runConfig.shipPresetId
   local ship           = assert(Ships[shipId], "Unknown ship preset: " .. tostring(shipId))
@@ -79,7 +79,7 @@ function Model.new(seed, runConfigOpts)
     log                = {},
 
     turn               = {
-      phase     = Const.TURN_PHASES.START,
+      phase     = Const.TURN_PHASES.BEGIN_FIRST_TURN,
       turnCount = 0
     },
 

@@ -6,7 +6,6 @@ local OptionsMenu   = require("ui.menus.options_menu")
 local Profiles      = require("profiles")
 local Store         = require("store")
 local ConfirmDialog = require("ui.menus.confirm_dialog")
--- local RNG       = require("rng")           -- optional if you move off math.random
 
 package.path        = package.path
     .. ";src/?.lua"
@@ -21,7 +20,7 @@ function love.load()
   love.graphics.setDefaultFilter("nearest", "nearest")
 
   -- NOTE: You'll eventually stop using math.random and seed your own RNG streams.
-  math.randomseed(os.time())
+  -- math.randomseed(os.time())
 
   local profileSummaries = Profiles.init()
   print("Loaded profiles:", #profileSummaries)

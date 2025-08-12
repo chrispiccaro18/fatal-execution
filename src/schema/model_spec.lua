@@ -4,6 +4,7 @@ local Const = require("const")
 -- Enums from Const (keep these strict)
 local TURN_PHASES = Const.TURN_PHASES
 local EFFECT_TRIGGERS = Const.EFFECTS_TRIGGERS
+local LOG_SEVERITY = Const.LOG.SEVERITY
 
 -- Minimal card instance shape (tighten as card lib stabilizes)
 local CardInstance = T.shape({
@@ -50,9 +51,7 @@ local DestructorCard = T.tbl
 local LogItem = T.shape({
   message  = T.str,
   category = T.optional(T.str),
-  severity = T.optional(T.enum({
-    "info","warn","error","debug"
-  })),
+  severity = T.optional(T.enum(LOG_SEVERITY)),
   visible  = T.optional(T.bool),
   ts       = T.optional(T.num),
   turn     = T.optional(T.num),

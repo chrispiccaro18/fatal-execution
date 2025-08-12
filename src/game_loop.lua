@@ -1,22 +1,28 @@
 local Const     = require("const")
-local Display   = require("ui.display")
-local Renderer  = require("renderer")
-local Click     = require("ui.click")
-local Menu      = require("ui.menus.menu")
-local EndGameUI = require("ui.elements.end_game")
 local Store     = require("store")
 local Profiles  = require("profiles")
 local cfg       = require("ui.cfg")
+local Display   = require("ui.display")
+local Renderer  = require("ui.renderer")
+local Click     = require("ui.click")
+local Menu      = require("ui.menus.menu")
+-- local EndGameUI = require("ui.elements.end_game")
+
+local TURN_PHASES = Const.TURN_PHASES
+local ACTIONS = Const.DISPATCH_ACTIONS
 
 local GameLoop  = {}
+GameLoop.profileIndex = nil
 
 function GameLoop.init(profileIndex, loadedModel)
+  GameLoop.profileIndex = profileIndex
   Store.bootstrap(loadedModel)
   -- Kick into a playable state if needed:
-  if Store.model.turn.phase ~= Const.TURN_PHASES.IN_PROGRESS then
-    Store.dispatch({ type = "BEGIN_TURN" })
+  local phase = Store.getPhase()
+  assert(phase, "GameLoop.init: No phase set in model!")
+  if phase == TURN_PHASES.BEGIN_FIRST_TURN then
+    Store.dispatch({ type = ACTIONS.BEGIN_TURN })
   end
-  GameLoop.profileIndex = profileIndex
 end
 
 function GameLoop.update(dt)
@@ -45,14 +51,14 @@ function GameLoop.draw()
   lg.pop()
 
   Menu.draw()
-  EndGameUI.draw()
+  -- EndGameUI.draw()
 end
 
 local function inputLocked() return Store.view and Store.view.inputLocked end
 
 function GameLoop.mousepressed(x, y, button)
   if Menu.mousepressed(x, y, button) then return end
-  if EndGameUI.mousepressed(x, y, button) then return end
+  -- if EndGameUI.mousepressed(x, y, button) then return end
   if inputLocked() then return end
 
   local vx, vy = Display.toVirtual(x, y)
@@ -70,10 +76,10 @@ function GameLoop.mousepressed(x, y, button)
   end
 
   -- end-game overlay
-  local phase = Store.model.turn.phase
-  if (phase == "won" or phase == "lost") and not EndGameUI.isOpen then
-    EndGameUI.isOpen = true
-  end
+  -- local phase = Store.model.turn.phase
+  -- if (phase == "won" or phase == "lost") and not EndGameUI.isOpen then
+  --   EndGameUI.isOpen = true
+  -- end
 end
 
 function GameLoop.keypressed(key)

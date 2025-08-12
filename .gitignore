@@ -2,3 +2,5 @@
 build
 static
 .last_build_version
+.gemini
+GEMINI.md

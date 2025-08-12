@@ -1,4 +1,3 @@
--- profiles/shape.lua
 local M = {}
 
 -- turns a concrete default table into a shape table of type tags

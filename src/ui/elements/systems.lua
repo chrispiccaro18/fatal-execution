@@ -1,139 +1,80 @@
 local cfg = require("ui.cfg")
-local Decorators = require("ui.decorators")
-local lg = love.graphics
+local lg  = love.graphics
+
+local colors = cfg.colors
 
 local SystemsUI = {}
 
-local progressFillDecorators = {}
-
-function SystemsUI.triggerProgress(payload)
-  local index = payload.systemIndex
-  local delta = payload.delta
-  if delta == 0 then return end
-
-  -- Start an animation entry
-  progressFillDecorators[index] = {
-    timer = 0,
-    duration = 0.4,
-    direction = delta > 0 and "increasing" or "decreasing"
-  }
-end
-
-function SystemsUI.update(dt)
-  for index, anim in pairs(progressFillDecorators) do
-    anim.timer = anim.timer + dt
-    if anim.timer >= anim.duration then
-      progressFillDecorators[index] = nil
-    end
-  end
-end
-
-Decorators.register(SystemsUI.update)
-
--- Returns rectangles for each system box and the progress bar, all inside `panel`
 local function layoutSystemsPanel(panel, cfgLocal, numSystems)
   local pad      = cfgLocal.pad
   local innerW   = panel.w - pad * 2
   local innerY   = panel.y + pad
 
-  -- First row: system boxes
   local wBox     = math.min(cfgLocal.boxW,
                             (innerW - cfgLocal.spacingX * (numSystems - 1)) / numSystems)
+
   local boxRects = {}
   for i = 1, numSystems do
     local x = panel.x + pad + (i - 1) * (wBox + cfgLocal.spacingX)
     boxRects[i] = { x = x, y = innerY, w = wBox, h = cfgLocal.boxH }
   end
 
-  -- Second row: progress bar spans full inner width
-  local barY = innerY + cfgLocal.boxH
-  local barW = innerW
-  local barR = { x = panel.x + pad, y = barY, w = barW, h = cfgLocal.barH }
-
+  local barY = innerY + cfgLocal.boxH + cfgLocal.spacingY
+  local barR = { x = panel.x + pad, y = barY, w = innerW, h = cfgLocal.barH }
   return boxRects, barR
 end
 
--- Draws the widgets.
-SystemsUI.drawSystemsPanel = function(panelRect)
-  local cfgSys     = cfg.systemsPanel
-  local gs         = love.gameState
-  local systems    = gs.systems
-  local curIndex   = gs.currentSystemIndex
-
+-- Draws without animations.
+-- systems: array of { name=..., required=..., progress=..., activated=... }
+-- currentIndex: integer (1-based)
+function SystemsUI.drawSystemsPanel(panelRect, systems, currentIndex)
+  local cfgSys   = cfg.systemsPanel
   local boxes, bar = layoutSystemsPanel(panelRect, cfgSys, #systems)
 
   -- Systems row
   for i, sys in ipairs(systems) do
     local r = boxes[i]
 
-    -- background
-    lg.setColor(0, 0, 0) -- black-ish fill
+    -- bg
+    lg.setColor(0, 0, 0)
     lg.rectangle("fill", r.x, r.y, r.w, r.h)
 
     -- border: white if current
-    if i == curIndex then
-      lg.setColor(1, 1, 1)       -- white border
-    else
-      lg.setColor(0.5, 0.5, 0.5) -- gray border for other systems
-    end
+    lg.setColor(i == currentIndex and colors.white or colors.lightGray)
     lg.rectangle("line", r.x, r.y, r.w, r.h)
 
-    -- system name
-    lg.setFont(lg.newFont(14))
-    lg.printf(sys.name, r.x, r.y + 10, r.w, "center")
+    -- name
+    lg.setFont(lg.newFont(14))  -- tip: cache fonts; don’t newFont() every frame
+    lg.printf(sys.name or ("System " .. i), r.x, r.y + 10, r.w, "center")
   end
 
-  -- Progress bar
-  local currSys  = systems[curIndex]
-  local sectionW = bar.w / currSys.required
+  -- Progress bar (discrete blocks)
+  local currSys  = systems[currentIndex]
+  if currSys then
+    local sectionW = bar.w / math.max(1, currSys.required)
 
-  lg.setColor(0, 0, 0) -- background
-  lg.rectangle("fill", bar.x, bar.y, bar.w, bar.h)
+    -- bg
+    lg.setColor(0, 0, 0)
+    lg.rectangle("fill", bar.x, bar.y, bar.w, bar.h)
 
-  -- lg.setColor(0.2, 0.2, 0.8) -- progress fill
-  local anim = progressFillDecorators[curIndex]
-  local progress = currSys.progress
-  local direction = anim and anim.direction
-  local pct = anim and math.min(1, anim.timer / anim.duration) or 1
-
-  for i = 1, currSys.required do
-    local sectionX = bar.x + (i - 1) * sectionW
-    local drawW = sectionW
-    local drawH = bar.h
-
-    local isFilled = i <= progress
-    local isAnimating = false
-
-    if anim then
-      if direction == "increasing" and i == progress then
-        -- Animate growing new block
-        isAnimating = true
-        drawW = sectionW * pct
-        lg.setColor(0.2, 0.2, 0.8)
-      elseif direction == "decreasing" and i == progress + 1 then
-        -- Animate shrinking old block (yellow)
-        isAnimating = true
-        drawW = sectionW * (1 - pct)
-        isFilled = true    -- temporarily still filled
-        lg.setColor(1, 1, 0) -- yellow
+    -- filled sections
+    for i = 1, currSys.required do
+      local filled = (i <= (currSys.progress or 0))
+      if filled then
+        lg.setColor(colors.blue)
+        local sx = bar.x + (i - 1) * sectionW
+        lg.rectangle("fill", sx, bar.y, sectionW, bar.h)
       end
     end
 
-    if isAnimating or isFilled then
-      if not isAnimating then
-        lg.setColor(0.2, 0.2, 0.8) -- standard filled blue
-      end
-
-      lg.rectangle("fill", sectionX, bar.y, drawW, drawH)
+    -- dividers + border
+    lg.setColor(1, 1, 1)
+    for i = 1, currSys.required - 1 do
+      local x = bar.x + i * sectionW
+      lg.line(x, bar.y, x, bar.y + bar.h)
     end
+    lg.rectangle("line", bar.x, bar.y, bar.w, bar.h)
   end
-  -- section dividers
-  lg.setColor(1, 1, 1)
-  for i = 1, currSys.required - 1 do
-    local x = bar.x + i * sectionW
-    lg.line(x, bar.y, x, bar.y + bar.h)
-  end
-  lg.rectangle("line", bar.x, bar.y, bar.w, bar.h) -- outer border
 end
 
 return SystemsUI

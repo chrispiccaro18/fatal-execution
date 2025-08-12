@@ -1,56 +1,59 @@
+-- rng.lua (pure Lua 5.1 compatible, no bit libs)
 local RNG = {}
 
-local function xor(a, b)
-  local result = 0
-  local bit = 1
-  while a > 0 or b > 0 do
-    local a_bit = a % 2
-    local b_bit = b % 2
-    if a_bit ~= b_bit then
-      result = result + bit
-    end
-    a = math.floor(a / 2)
-    b = math.floor(b / 2)
-    bit = bit * 2
-  end
-  return result
+-- Park–Miller "minimal standard" constants (31-bit)
+local M = 2147483647       -- 2^31 - 1 (prime)
+local A = 16807            -- multiplier
+-- Note: A * (M-1) < 3.6e13  <<  2^53, so double math is exact here.
+
+local function step(seed)
+  -- next = (A * seed) mod M, with exact double arithmetic
+  return (A * seed) % M
 end
 
-local function hash32(seed, label)
-  -- Tiny string hash
-  local h = seed or 0x9E3779B1
-  for i = 1, #label do
-    h = (((xor(h, string.byte(label, i))) * 0x45d9f3b) % 0x80000000)
+-- Simple 31-bit string hash using the same safe multiply
+local function hash31(seed, str)
+  local h = seed
+  for i = 1, #str do
+    h = (A * h + string.byte(str, i) + 1) % M
   end
+  -- keep in [1, M-1] to avoid the zero state
+  if h == 0 then h = 1 end
   return h
 end
 
 function RNG.makeStream(rootSeed, label)
-  return { seed = ((rootSeed + hash32(rootSeed, label)) % 0x80000000), idx = 0 }
+  -- normalize user seed to [1, M-1]
+  local s = tonumber(rootSeed) or 1
+  s = math.floor(math.abs(s)) % (M - 1)
+  if s == 0 then s = 1 end
+
+  if label then
+    s = hash31(s, tostring(label))
+  end
+
+  return { seed = s, idx = 0 }
 end
 
--- super simple LCG; swap later for xoshiro?
-local A = 1103515245
-local C = 12345
-local M = 2^31
-
-local function step(s)
-  s.seed = (A * s.seed + C) % M
-  s.idx = s.idx + 1
-  return s.seed
+local function nextInt31(state)
+  local x = step(state.seed)
+  state.seed = x
+  state.idx = state.idx + 1
+  return x
 end
 
-function RNG.next01(s) return step(s) / (M - 1) end
+function RNG.next01(state)
+  return nextInt31(state) / M
+end
 
--- helpers for ints and array picks
-function RNG.nextInt(s, lo, hi)
-  local r = RNG.next01(s)
+function RNG.nextInt(state, lo, hi)
+  local r = RNG.next01(state)
   return lo + math.floor(r * (hi - lo + 1))
 end
 
-function RNG.pick(s, array)
+function RNG.pick(state, array)
   if #array == 0 then return nil end
-  return array[RNG.nextInt(s, 1, #array)]
+  return array[RNG.nextInt(state, 1, #array)]
 end
 
 return RNG
