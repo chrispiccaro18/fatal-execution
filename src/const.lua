@@ -31,6 +31,11 @@ Const.DISPATCH_ACTIONS        = {
   DISCARD_CARD = "discard_card",
   PLAY_CARD = "play_card",
   END_TURN = "end_turn",
+  LOG_DEBUG  = "log_debug",
+}
+
+Const.TASKS                = {
+  DEAL_CARDS = "deal_cards",
 }
 
 Const.UI                      = {
@@ -239,6 +244,8 @@ Const.LOG                     =
   },
   CATEGORY = {
     GENERAL = "general",
+    TASK_DEBUG = "task_debug",
+    CARD_DRAW = "card_draw",
   }
 }
 

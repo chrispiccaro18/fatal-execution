@@ -27,9 +27,9 @@ function LogsUI.drawLogs(panel, allLogs)
   lg.printf("RECENT LOGS:", x, y, panel.w - pad * 2, "left")
   y = y + lnH
 
-  local visibleLogs = Log.visible(allLogs)
-  for i = math.max(1, #visibleLogs - 9), #visibleLogs do
-    local log = visibleLogs[i]
+  local visibleTrimmed = Log.visibleTrimmed(allLogs, 10)
+  for i = 1, #visibleTrimmed do
+    local log = visibleTrimmed[i]
     local msg = log.message
     lg.printf(msg, x, y, panel.w - pad * 2, "left")
     y = y + lnH

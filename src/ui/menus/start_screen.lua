@@ -1,26 +1,27 @@
-local Const             = require("const")
-local cfg               = require("ui.cfg")
-local Profiles          = require("profiles")
-local ActiveProfile     = require("profiles.active")
-local Version           = require("version")
-local GameLoop          = require("game_loop")
-local Click             = require("ui.click")
-local Display           = require("ui.display")
-local SelectScreen      = require("ui.menus.select_screen")
-local OptionsMenu       = require("ui.menus.options_menu")
-local EditProfile       = require("ui.menus.edit_profile")
-local ConfirmDialog     = require("ui.menus.confirm_dialog")
+local Const               = require("const")
+local cfg                 = require("ui.cfg")
+local Profiles            = require("profiles")
+local ActiveProfile       = require("profiles.active")
+local Version             = require("version")
+local GameLoop            = require("game_loop")
+local Click               = require("ui.click")
+local Display             = require("ui.display")
+local SelectScreen        = require("ui.menus.select_screen")
+local OptionsMenu         = require("ui.menus.options_menu")
+local EditProfile         = require("ui.menus.edit_profile")
+local ConfirmDialog       = require("ui.menus.confirm_dialog")
 
-local StartScreen       = {}
+local StartScreen         = {}
 
-local startScreenStates = Const.START_SCREEN_STATES
-local hitIds            = Const.HIT_IDS.START_SCREEN
-local buttonLabels      = Const.BUTTON_LABELS.START_SCREEN
+local CURRENT_SCREEN      = Const.CURRENT_SCREEN
+local START_SCREEN_STATES = Const.START_SCREEN_STATES
+local HIT_IDS             = Const.HIT_IDS.START_SCREEN
+local BUTTON_LABELS       = Const.BUTTON_LABELS.START_SCREEN
 
-StartScreen.activeIndex = nil
-StartScreen.state       = startScreenStates.LOADING
-StartScreen.profile     = nil
-StartScreen.nameInput   = ""
+StartScreen.activeIndex   = nil
+StartScreen.state         = START_SCREEN_STATES.LOADING
+StartScreen.profile       = nil
+StartScreen.nameInput     = ""
 
 local function loadProfile(index)
   if not index then return nil end
@@ -33,11 +34,11 @@ function StartScreen.load()
   if index and Profiles.profileExists(index) then
     StartScreen.activeIndex = index
     StartScreen.profile     = loadProfile(index)
-    StartScreen.state       = startScreenStates.MENU
+    StartScreen.state       = START_SCREEN_STATES.MENU
   else
     StartScreen.activeIndex = nil
     StartScreen.profile     = nil
-    StartScreen.state       = startScreenStates.SELECT
+    StartScreen.state       = START_SCREEN_STATES.SELECT
   end
 end
 
@@ -65,7 +66,7 @@ local function deleteProfile(result)
 
   ConfirmDialog.open(deleteText, onConfirm, onCancel, options)
   StartScreen.nameInput = ""
-  StartScreen.state     = startScreenStates.SELECT
+  StartScreen.state     = START_SCREEN_STATES.SELECT
 end
 
 function StartScreen.draw()
@@ -75,13 +76,13 @@ function StartScreen.draw()
 
   Click.clear()
 
-  if StartScreen.state == startScreenStates.SELECT then
+  if StartScreen.state == START_SCREEN_STATES.SELECT then
     SelectScreen.draw()
-  elseif StartScreen.state == startScreenStates.LOADING then
+  elseif StartScreen.state == START_SCREEN_STATES.LOADING then
     lg.printf("Loading...", 0, H / 2 - 20, W, "center")
-  elseif StartScreen.state == startScreenStates.NAME_ENTRY then
+  elseif StartScreen.state == START_SCREEN_STATES.NAME_ENTRY then
     EditProfile.draw(StartScreen.nameInput)
-  elseif StartScreen.state == startScreenStates.MENU then
+  elseif StartScreen.state == START_SCREEN_STATES.MENU then
     local buttonW, buttonH = 300, 40
     local startX, startY   = (W - buttonW) / 2, 100
     local spacing          = 50
@@ -107,11 +108,11 @@ function StartScreen.draw()
 
     local hasRun = StartScreen.profile and StartScreen.profile.currentRun
 
-    add(hitIds.CONTINUE, buttonLabels.CONTINUE, not hasRun)
-    add(hitIds.NEW, buttonLabels.NEW, false)
-    add(hitIds.OPTIONS, buttonLabels.OPTIONS, false)
-    add(hitIds.CHANGE, buttonLabels.CHANGE, false)
-    add(hitIds.QUIT, buttonLabels.QUIT, false)
+    add(HIT_IDS.CONTINUE, BUTTON_LABELS.CONTINUE, not hasRun)
+    add(HIT_IDS.NEW, BUTTON_LABELS.NEW, false)
+    add(HIT_IDS.OPTIONS, BUTTON_LABELS.OPTIONS, false)
+    add(HIT_IDS.CHANGE, BUTTON_LABELS.CHANGE, false)
+    add(HIT_IDS.QUIT, BUTTON_LABELS.QUIT, false)
 
     -- Version number
     lg.setColor(cfg.colors.white)
@@ -132,7 +133,7 @@ function StartScreen.mousepressed(x, y, button)
   local hit = Click.hit(x, y)
   if not hit then return end
 
-  if StartScreen.state == startScreenStates.SELECT then
+  if StartScreen.state == START_SCREEN_STATES.SELECT then
     local result = SelectScreen.mousepressed(hit)
     if result then
       if result.type == "select" then
@@ -141,39 +142,39 @@ function StartScreen.mousepressed(x, y, button)
       elseif result.type == "new" then
         StartScreen.nameInput   = ""
         StartScreen.activeIndex = result.index
-        StartScreen.state       = startScreenStates.NAME_ENTRY
+        StartScreen.state       = START_SCREEN_STATES.NAME_ENTRY
       elseif result.type == "delete" then
         deleteProfile(result)
       end
     end
-  elseif StartScreen.state == startScreenStates.NAME_ENTRY then
+  elseif StartScreen.state == START_SCREEN_STATES.NAME_ENTRY then
     local result = EditProfile.mousepressed(hit, StartScreen.nameInput)
     createNewProfile(result)
-  elseif StartScreen.state == startScreenStates.MENU then
-    if hit.id == hitIds.CONTINUE and StartScreen.profile and StartScreen.profile.currentRun then
+  elseif StartScreen.state == START_SCREEN_STATES.MENU then
+    if hit.id == HIT_IDS.CONTINUE and StartScreen.profile and StartScreen.profile.currentRun then
       GameLoop.init(StartScreen.activeIndex, StartScreen.profile.currentRun)
-      CurrentScreen = Const.CURRENT_SCREEN.GAME
-    elseif hit.id == hitIds.NEW then
+      CurrentScreen = CURRENT_SCREEN.GAME
+    elseif hit.id == HIT_IDS.NEW then
       GameLoop.init(StartScreen.activeIndex, nil)
-      CurrentScreen = Const.CURRENT_SCREEN.GAME
-    elseif hit.id == hitIds.OPTIONS then
+      CurrentScreen = CURRENT_SCREEN.GAME
+    elseif hit.id == HIT_IDS.OPTIONS then
       OptionsMenu.open(StartScreen.activeIndex)
-    elseif hit.id == hitIds.CHANGE then
-      StartScreen.state = startScreenStates.SELECT
-    elseif hit.id == hitIds.QUIT then
+    elseif hit.id == HIT_IDS.CHANGE then
+      StartScreen.state = START_SCREEN_STATES.SELECT
+    elseif hit.id == HIT_IDS.QUIT then
       love.event.quit()
     end
   end
 end
 
 function StartScreen.textinput(t)
-  if StartScreen.state == startScreenStates.NAME_ENTRY then
+  if StartScreen.state == START_SCREEN_STATES.NAME_ENTRY then
     StartScreen.nameInput = EditProfile.textinput(t, StartScreen.nameInput)
   end
 end
 
 function StartScreen.keypressed(key)
-  if StartScreen.state == startScreenStates.NAME_ENTRY then
+  if StartScreen.state == START_SCREEN_STATES.NAME_ENTRY then
     if key == "backspace" then
       StartScreen.nameInput = EditProfile.backspace(StartScreen.nameInput)
     elseif key == "return" then
