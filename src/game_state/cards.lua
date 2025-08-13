@@ -1,17 +1,11 @@
 -- Runtime helpers for creating instances from the registry.
 -- Adds transient UI fields. Provides hydrate/strip helpers.
 Const = require("const")
+local copy = require("util.copy")
 local Registry = require("data.cards")
 
 local Cards = {}
 local IDLE = Const.CARD_STATES.IDLE
-
--- shallow copy (enough for our flat defs)
-local function copy(t)
-  local r = {}
-  for k,v in pairs(t) do r[k] = v end
-  return r
-end
 
 -- Create a runtime card instance from a registry id.
 -- By default this returns a FULLY REALIZED card (safe to serialize).

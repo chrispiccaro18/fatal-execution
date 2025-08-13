@@ -41,12 +41,22 @@ Const.TASKS                = {
 Const.UI                      = {
   ANIM = {
     DRAW_INTERVAL = 0.12, -- spacing between successive draws
-    DRAW_TIME = 0.18      -- time to draw a single card
+    DRAW_TIME = 0.25      -- time to draw a single card
   },
   INTENTS = {
-    HAND_FILL_BEGIN = "hand_fill_begin",
-    HAND_FILL_END = "hand_fill_end",
-    ANIMATE_DRAW_CARD = "animate_draw_card",
+    -- HAND_FILL_BEGIN = "hand_fill_begin",
+    -- HAND_FILL_END = "hand_fill_end",
+    -- ANIMATE_DRAW_CARD = "animate_draw_card",
+    CARD_DRAW = "card_draw",
+    REFLOW_HAND = "reflow_hand"
+  },
+  TWEENS = {
+    CARD_FLY = "card_fly"
+  },
+  HAND_LAYOUT_MODE = {
+    SPACED = "spaced",
+    OVERLAP = "overlap",
+    FAN = "fan",
   }
 }
 
@@ -88,6 +98,7 @@ Const.HIT_IDS                 = {
     RES_RIGHT         = "res_right",
     BACK              = "options_back",
   },
+  CARD = "card",
 }
 
 Const.BUTTON_LABELS           = {
@@ -246,6 +257,7 @@ Const.LOG                     =
     GENERAL = "general",
     TASK_DEBUG = "task_debug",
     CARD_DRAW = "card_draw",
+    EFFECT = "effect"
   }
 }
 

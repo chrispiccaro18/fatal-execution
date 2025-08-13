@@ -66,13 +66,13 @@ function GameLoop.mousepressed(x, y, button)
   if not hit then return end
 
   if button == 1 then
-    if hit.id == "endTurn" then
-      Store.dispatch({ type = "END_TURN" })
-    elseif hit.id == "card" then
-      Store.dispatch({ type = "PLAY_CARD", idx = hit.payload.handIndex })
+    if hit.id == Const.END_TURN_BUTTON.ID then
+      Store.dispatch({ type = ACTIONS.END_TURN })
+    elseif hit.id == Const.HIT_IDS.CARD then
+      Store.dispatch({ type = ACTIONS.PLAY_CARD, idx = hit.payload.handIndex })
     end
-  elseif button == 2 and hit.id == "card" then
-    Store.dispatch({ type = "DISCARD_CARD", idx = hit.payload.handIndex })
+  elseif button == 2 and hit.id == Const.HIT_IDS.CARD then
+    Store.dispatch({ type = ACTIONS.DISCARD_CARD, idx = hit.payload.handIndex })
   end
 
   -- end-game overlay

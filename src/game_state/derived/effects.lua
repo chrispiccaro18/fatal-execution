@@ -1,15 +1,15 @@
 local Const   = require("const")
-local copy    = require("util.copy")
+local immut   = require("util.immut")
 
 local Effects = {}
 
--- Collect active env effects by trigger (systems that are activated + threats with matching trigger)
+-- READ ONLY: Collect active env effects by trigger (systems that are activated + threats with matching trigger)
 -- Returns a flat array of { source="Power", kind="system"|"threat", index=idx, effect=envEffect }
-function Effects.collectActive(state, trigger)
+function Effects.collectActive(model, trigger)
   local out = {}
 
   -- Systems (activated only)
-  for i, sys in ipairs(state.systems or {}) do
+  for i, sys in ipairs(model.systems or {}) do
     if sys.activated and sys.envEffect and sys.envEffect.trigger == trigger then
       out[#out + 1] = {
         source = sys.name or sys.id,
@@ -22,7 +22,7 @@ function Effects.collectActive(state, trigger)
   end
 
   -- Threats (plural)
-  for i, th in ipairs(state.threats or {}) do
+  for i, th in ipairs(model.threats or {}) do
     if th.envEffect and th.envEffect.trigger == trigger then
       out[#out + 1] = {
         source = th.name or th.id,
@@ -75,67 +75,76 @@ function Effects.collectAllActive(state)
   return out
 end
 
--- Apply ONE effect and return a new state + a tiny, UI-agnostic "note" for logging/UIs.
--- The note is a structured description your TaskRunner can turn into Log/UI intents.
-function Effects.apply(state, effect, ctx)
-  -- ctx can include fields like {source="Power", kind="system"|"threat", index=1}
-  local s = copy(state)
-  local note = nil
+-- slices is a table like:
+--   { handSize = number, ram = number, threats = array-of-threats }
+-- Returns (newSlices, note)
+-- note can be used for Log and UI { msg = string, tag = string, amount = number, index = number(threat index), source = string, kind = string }
+function Effects.applySlices(slices, effect, ctx)
+  local handSize = slices.handSize
+  local ram      = slices.ram
+  local threats  = slices.threats
+  local note     = nil
 
   if effect.type == Const.EFFECTS.MODIFY_HAND_SIZE then
-    local before = s.handSize
-    s.handSize = (s.handSize or 0) + (effect.amount or 0)
-    note = { msg = ("Max hand size %+d → %d"):format(effect.amount or 0, s.handSize), tag = "hand_size" }
+    local amt = effect.amount or 0
+    handSize  = (handSize or 0) + amt
+    note = { msg = ("Max hand size %+d → %d"):format(amt, handSize), tag = "hand_size" }
+
   elseif effect.type == Const.EFFECTS.GAIN_RAM then
     local delta = effect.amount or 0
-    s.ram = (s.ram or 0) + delta
+    ram = (ram or 0) + delta
     note = { msg = ("Gain %d RAM"):format(delta), tag = "ram_gain", amount = delta }
+
   elseif effect.type == Const.EFFECTS.THREAT_TICK then
-    -- You choose which threat index to tick in the caller.
-    -- If ctx.kind=="threat" and ctx.index set, tick that threat, else default to 1.
     local idx = (ctx and ctx.kind == Const.PLAY_EFFECT_KINDS.THREAT and ctx.index) or 1
-    local th = s.threats and s.threats[idx]
-    if th then
-      local before = th.value or 0
-      local amt = effect.amount or 1
-      local after = before + amt
-      if after > th.max then after = th.max end
-      -- write back as a shallow update
-      local threats = {}
-      for i, t in ipairs(s.threats) do
-        if i ~= idx then
-          threats[i] = t
-        else
-          threats[i] = { id = t.id, name = t.name, value = after, max = t.max, envEffect = t.envEffect }
-        end
-      end
-      s.threats = threats
-      note = {
-        msg = ("Threat '%s' +%d (%d/%d)"):format(th.name or th.id, amt, after, th.max),
-        tag = "threat_tick",
-        index =
-            idx,
-        amount = amt
+    local t = threats and threats[idx]
+    if t then
+      local before = t.value or 0
+      local amt    = effect.amount or 1
+      local after  = before + amt
+      if t.max and after > t.max then after = t.max end
+
+      -- immutably replace that threat only
+      local newThreats = immut.copyArray(threats or {})
+      newThreats[idx] = {
+        id = t.id, name = t.name,
+        value = after, max = t.max,
+        envEffect = t.envEffect
       }
+      threats = newThreats
+
+      note = {
+        msg   = ("Threat '%s' +%d (%d/%d)"):format(t.name or t.id, amt, after, t.max or after),
+        tag   = "threat_tick",
+        index = idx,
+        amount= amt,
+      }
+    else
+      note = { msg = "Threat tick: invalid index", tag = "noop" }
     end
-  elseif effect.type == Const.EFFECTS.MULTIPLY_EFFECTS then
-    -- Example hook: store a multiplier on state for the *next* resolution step.
-    -- Caller should decide how/when to consume this.
-    s.effectMultiplier = (s.effectMultiplier or 1) * (effect.multiplier or 1)
-    note = { msg = ("Effects x%d"):format(effect.multiplier or 1), tag = "multiplier" }
+
+  -- elseif effect.type == Const.EFFECTS.MULTIPLY_EFFECTS then
+  --   -- If you later implement a multiplier accumulator, store it in slices (optional)
+  --   -- slices.effectMultiplier = (slices.effectMultiplier or 1) * (effect.multiplier or 1)
+  --   note = { msg = ("Effects x%d"):format(effect.multiplier or 1), tag = "multiplier" }
+
   else
-    -- Unknown/no-op effect types are allowed; return state unchanged.
     note = { msg = "No-op effect: " .. tostring(effect.type), tag = "noop" }
   end
 
-  -- Attach minimal context to note so the UI/logger knows source/trigger.
+  -- Attach minimal context
   if note then
     if ctx and ctx.source then note.source = ctx.source end
-    if ctx and ctx.kind then note.kind = ctx.kind end
-    if ctx and ctx.index then note.index = ctx.index end
+    if ctx and ctx.kind   then note.kind   = ctx.kind   end
+    if ctx and ctx.index  then note.index  = ctx.index  end
   end
 
-  return s, note
+  return {
+    handSize = handSize,
+    ram      = ram,
+    threats  = threats,
+    -- effectMultiplier = slices.effectMultiplier, -- if you add it
+  }, note
 end
 
 -- Utility to pretty describe an effect (for tooltips/menus)

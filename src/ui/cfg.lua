@@ -87,11 +87,20 @@ return {
   },
 
   handPanel       = {
-    pad         = 10,
-    fontSize    = 12,
-    cardW       = Const.CARD_WIDTH,
-    cardH       = Const.CARD_HEIGHT,
-    maxSpacingX = 10, -- max spacing between cards
+    pad           = 10,
+    fontSize      = 12,
+    cardW         = Const.CARD_WIDTH,
+    cardH         = Const.CARD_HEIGHT,
+    maxSpacingX   = 10, -- max spacing between cards
+    minVisiblePx  = Const.CARD_WIDTH / 4, -- when overlapping, how much of next card is visible
+    fanThresholdN = 6, -- switch to fan at/after this many cards
+    fan           = {
+      enabled     = true,
+      maxAngleDeg = 12, -- max tip on edges
+      liftPx      = 10, -- slight lift across arc baseline
+      centerLift  = 6, -- center card gets a bit more lift
+      spreadBoost = 8, -- extra px spacing when hovered (UI state)
+    },
   },
 
   destructorPanel = {

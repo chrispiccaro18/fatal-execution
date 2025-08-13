@@ -1,6 +1,7 @@
-local cfg    = require("ui.cfg")
+local cfg        = require("ui.cfg")
+local HandLayout = require("ui.layout.hand")
 
-local Layout = {}
+local Layout     = {}
 
 local function rect(x, y, w, h) return { x = x, y = y, w = w, h = h } end
 
@@ -75,7 +76,13 @@ end
 function Layout.compute(W, H)
   local sections = {}
   relayout(W, H, sections)
-  return { sections = sections }
+
+  local handPanel = sections.play
+  local getHandSlots = function(n) return HandLayout.computeSlots(handPanel, n) end
+  return {
+    sections = sections,
+    getHandSlots = getHandSlots
+  }
 end
 
 return Layout

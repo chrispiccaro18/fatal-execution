@@ -22,7 +22,7 @@ function Store.dispatch(action)
   if newTasks and #newTasks > 0 then
     local existing = newModel.tasks or {}
     local merged = immut.copyArray(existing)
-    for _, t in ipairs(newTasks) do merged[#merged+1] = t end
+    for _, newTask in ipairs(newTasks) do merged[#merged + 1] = newTask end
     newModel = immut.assign(newModel, "tasks", merged)
   end
 
