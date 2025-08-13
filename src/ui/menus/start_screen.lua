@@ -73,6 +73,8 @@ function StartScreen.draw()
   local lg = love.graphics
   local W, H = Display.getVirtualSize()
   lg.setFont(lg.newFont(cfg.fontSizeXL))
+  lg.setColor(cfg.colors.black)
+  lg.rectangle("fill", 0, 0, W, H)
 
   Click.clear()
 

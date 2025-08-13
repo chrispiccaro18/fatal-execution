@@ -1,5 +1,6 @@
 local Const = require("const")
 local Profiles = require("profiles")
+local Display = require("ui.display")
 local RunLogger = require("profiles.run_logger")
 local Click = require("ui.click")
 local ActiveProfile = require("profiles.active")
@@ -35,9 +36,9 @@ end
 function Menu.draw()
   if not Menu.isOpen then return end
 
+
+  local W, H = Display.getVirtualSize()
   local lg = love.graphics
-  local W, H = lg.getWidth(), lg.getHeight()
-  lg.push()
   lg.setColor(0, 0, 0, 0.6)
   lg.rectangle("fill", 0, 0, W, H)
 
@@ -70,8 +71,6 @@ function Menu.draw()
       20
     )
   end
-
-  lg.pop()
 end
 
 function Menu.mousepressed(x, y, button)
