@@ -1,6 +1,6 @@
-local deepcopy       = require("util.deepcopy")
 -- deepcopy options
 -- skipFns=true, skipUd=true, copyMeta=false
+local deepcopy       = require("util.deepcopy")
 local ProfilesUtils  = require("profiles.utils")
 local Factory        = require("profiles.factory")
 local Version        = require("version")
@@ -25,8 +25,6 @@ end
 
 -- ---------- IO ----------
 local function loadSlot(index)
-  print("In loadSlot(index)", index)
-  print("full save file path", love.filesystem.getSaveDirectory(), getFilename(index))
   local filename = getFilename(index)
   local info = love.filesystem.getInfo(filename)
   if not info then
@@ -143,6 +141,7 @@ end
 
 -- ---------- lifecycle ----------
 function Profiles.init()
+  print("[Profiles.init]", love.filesystem.getSaveDirectory())
   local summary = {}
   for i = 1, MAX_PROFILES do
     local data = loadSlot(i) -- may be nil if no file

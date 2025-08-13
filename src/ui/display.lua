@@ -1,3 +1,4 @@
+local lg = love.graphics
 local Display                        = {}
 
 Display.presets                      = {
@@ -9,9 +10,43 @@ Display.presets                      = {
 
 -- baseline the whole game was designed for
 Display.VIRTUAL_W, Display.VIRTUAL_H = 1280, 720
-Display.canvas                       = love.graphics.newCanvas(Display.VIRTUAL_W, Display.VIRTUAL_H)
+Display.canvas                       = lg.newCanvas(Display.VIRTUAL_W, Display.VIRTUAL_H)
 Display.scale                        = 1
-Display.offsetX, Display.offsetY     = 0, 0
+Display.offsetX                      = 0
+Display.offsetY                      = 0
+
+function Display.getVirtualSize()
+  return Display.VIRTUAL_W, Display.VIRTUAL_H
+end
+
+-- Only this module touches real window/screen size
+function Display._getWindowSize()
+  local w, h = lg.getDimensions()
+  return w, h
+end
+
+function Display.refresh()
+  local ww, wh = Display._getWindowSize()
+  local s = math.min(ww / Display.VIRTUAL_W, wh / Display.VIRTUAL_H)
+  -- allow fractional scale; clamp to >= 1 if you prefer:
+  -- s = math.max(s, 1)
+  Display.scale = s
+  Display.offsetX = math.floor((ww - Display.VIRTUAL_W * s) / 2)
+  Display.offsetY = math.floor((wh - Display.VIRTUAL_H * s) / 2)
+end
+
+
+-- function Display.apply(index, fullscreen)
+--   local mode = Display.presets[index]
+--   assert(mode, "invalid display preset index")
+--   local ok = love.window.setMode(mode.w, mode.h, {
+--     fullscreen = fullscreen or false,
+--     resizable  = true,  -- allow resizing so refresh() is useful
+--     vsync      = true,
+--   })
+--   assert(ok, "could not switch resolution")
+--   Display.refresh()
+-- end
 
 function Display.apply(index, fullscreen)
   local mode = Display.presets[index]

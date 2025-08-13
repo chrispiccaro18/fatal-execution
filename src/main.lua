@@ -1,21 +1,27 @@
-local Const         = require("const")
-local StartScreen   = require("ui.menus.start_screen")
-local GameLoop      = require("game_loop")
-local RunLogger     = require("profiles.run_logger")
-local OptionsMenu   = require("ui.menus.options_menu")
-local Profiles      = require("profiles")
-local Store         = require("store")
-local ConfirmDialog = require("ui.menus.confirm_dialog")
+local Const          = require("const")
+local StartScreen    = require("ui.menus.start_screen")
+local GameLoop       = require("game_loop")
+-- local RunLogger      = require("profiles.run_logger")
+local Display        = require("ui.display")
+local DebugOverlay   = require("ui.debug_overlay")
+local OptionsMenu    = require("ui.menus.options_menu")
+local Profiles       = require("profiles")
+local Store          = require("store")
+local ConfirmDialog  = require("ui.menus.confirm_dialog")
 
-package.path        = package.path
+local lg = love.graphics
+
+package.path         = package.path
     .. ";src/?.lua"
     .. ";src/?/init.lua"
     .. ";src/?/?.lua"
 
-_G.CurrentScreen    = Const.CURRENT_SCREEN.START
+local CURRENT_SCREEN = Const.CURRENT_SCREEN
+_G.CurrentScreen     = CURRENT_SCREEN.START
 
 function love.load()
-  print(_VERSION)
+  print("Lua Version: " .. _VERSION)
+  print("LOVE Version: " .. love.getVersion())
 
   love.graphics.setDefaultFilter("nearest", "nearest")
 
@@ -28,7 +34,7 @@ function love.load()
   for i, summary in ipairs(profileSummaries) do
     print(string.format("  %d: %s", i, summary.exists and "Exists" or "Empty"))
   end
-  RunLogger.load()
+  -- RunLogger.load()
   StartScreen.load()
 
   -- If you ever want to auto-resume a run at boot:
@@ -38,9 +44,9 @@ function love.load()
 end
 
 function love.update(dt)
-  if CurrentScreen == Const.CURRENT_SCREEN.START then
+  if CurrentScreen == CURRENT_SCREEN.START then
     -- start screen doesn't need update yet
-  elseif CurrentScreen == Const.CURRENT_SCREEN.GAME then
+  elseif CurrentScreen == CURRENT_SCREEN.GAME then
     -- Drive game systems & UI as before
     GameLoop.update(dt)
     -- Drive the Store task runner & UI transition engine (NEW)
@@ -54,14 +60,23 @@ function love.update(dt)
 end
 
 function love.draw()
-  if CurrentScreen == Const.CURRENT_SCREEN.START then
+  lg.push()
+  lg.translate(Display.offsetX, Display.offsetY)
+  lg.scale(Display.scale, Display.scale)
+  lg.setColor(1,1,1,1)
+  lg.draw(Display.canvas, 0, 0)
+  lg.pop()
+
+  if CurrentScreen == CURRENT_SCREEN.START then
     StartScreen.draw()
-  elseif CurrentScreen == Const.CURRENT_SCREEN.GAME then
+  elseif CurrentScreen == CURRENT_SCREEN.GAME then
     GameLoop.draw()
   end
 
   OptionsMenu.draw()
   ConfirmDialog.draw()
+
+  DebugOverlay.draw(Display)
 end
 
 local function inputLocked()
@@ -83,9 +98,9 @@ function love.mousepressed(x, y, button)
     return
   end
 
-  if CurrentScreen == Const.CURRENT_SCREEN.START then
+  if CurrentScreen == CURRENT_SCREEN.START then
     StartScreen.mousepressed(x, y, button)
-  elseif CurrentScreen == Const.CURRENT_SCREEN.GAME then
+  elseif CurrentScreen == CURRENT_SCREEN.GAME then
     GameLoop.mousepressed(x, y, button)
   end
 end
@@ -95,18 +110,22 @@ function love.keypressed(key)
     if ConfirmDialog.keypressed(key) then return end
   end
 
-  if CurrentScreen == Const.CURRENT_SCREEN.START then
+  if CurrentScreen == CURRENT_SCREEN.START then
     StartScreen.keypressed(key)
-  elseif CurrentScreen == Const.CURRENT_SCREEN.GAME then
+  elseif CurrentScreen == CURRENT_SCREEN.GAME then
     -- Optional: allow some keys while locked (e.g., pause menu).
     if not inputLocked() or key == "escape" or key == "m" then
       GameLoop.keypressed(key)
     end
   end
+
+  if key == "f3" then
+    DebugOverlay.toggle()
+  end
 end
 
 function love.textinput(text)
-  if CurrentScreen == Const.CURRENT_SCREEN.START then
+  if CurrentScreen == CURRENT_SCREEN.START then
     StartScreen.textinput(text)
   end
 end

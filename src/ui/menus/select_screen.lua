@@ -1,4 +1,5 @@
 local Profiles = require("profiles")
+local Display = require("ui.display")
 local Click = require("ui.click")
 
 local SelectScreen = {}
@@ -7,7 +8,7 @@ local cachedProfiles = Profiles.getCachedProfiles()
 
 function SelectScreen.draw()
   local lg = love.graphics
-  local W, H = lg.getDimensions()
+  local W, H = Display.getVirtualSize()
   lg.setFont(lg.newFont(22))
 
   lg.printf("Select a Profile", 0, 80, W, "center")

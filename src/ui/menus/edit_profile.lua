@@ -1,3 +1,4 @@
+local Display = require("ui.display")
 local Click = require("ui.click")
 
 local EditProfile = {}
@@ -6,7 +7,7 @@ local inValidName = false
 
 function EditProfile.draw(nameInput)
   local lg = love.graphics
-  local W, H = lg.getDimensions()
+  local W, H = Display.getVirtualSize()
   lg.setFont(lg.newFont(22))
 
   lg.printf("Enter Profile Name:", 0, 80, W, "center")

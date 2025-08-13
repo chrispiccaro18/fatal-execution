@@ -5,6 +5,7 @@ local ActiveProfile     = require("profiles.active")
 local Version           = require("version")
 local GameLoop          = require("game_loop")
 local Click             = require("ui.click")
+local Display           = require("ui.display")
 local SelectScreen      = require("ui.menus.select_screen")
 local OptionsMenu       = require("ui.menus.options_menu")
 local EditProfile       = require("ui.menus.edit_profile")
@@ -69,7 +70,7 @@ end
 
 function StartScreen.draw()
   local lg = love.graphics
-  local W, H = lg.getDimensions()
+  local W, H = Display.getVirtualSize()
   lg.setFont(lg.newFont(cfg.fontSizeXL))
 
   Click.clear()

@@ -12,11 +12,6 @@ local OptionsMenu = {
 local hitIds = Const.HIT_IDS.OPTIONS_MENU
 local buttonLabels = Const.BUTTON_LABELS.OPTIONS_MENU
 
-
-local function applyDisplay(resIndex, fullscreen)
-  Display.apply(resIndex, fullscreen)
-end
-
 function OptionsMenu.open(profileIndex)
   OptionsMenu.activeIndex = profileIndex
   OptionsMenu.profile = Profiles.get(profileIndex)
@@ -34,7 +29,7 @@ function OptionsMenu.draw()
   if not OptionsMenu.isOpen then return end
 
   local lg = love.graphics
-  local W, H = lg.getDimensions()
+  local W, H = Display.getVirtualSize()
   lg.setFont(lg.newFont(22))
   Click.clear()
 
@@ -109,15 +104,15 @@ function OptionsMenu.mousepressed(x, y, button)
     settings.showTooltips = not settings.showTooltips
   elseif hit.id == hitIds.TOGGLE_FULLSCREEN then
     settings.fullscreen = not settings.fullscreen
-    applyDisplay(settings.resolutionIndex, settings.fullscreen)
+    Display.apply(settings.resolutionIndex, settings.fullscreen)
   elseif hit.id == hitIds.RES_LEFT then
     local count = #Display.presets
     settings.resolutionIndex = ((settings.resolutionIndex - 2 + count) % count) + 1
-    applyDisplay(settings.resolutionIndex, settings.fullscreen)
+    Display.apply(settings.resolutionIndex, settings.fullscreen)
   elseif hit.id == hitIds.RES_RIGHT then
     local count = #Display.presets
     settings.resolutionIndex = (settings.resolutionIndex % count) + 1
-    applyDisplay(settings.resolutionIndex, settings.fullscreen)
+    Display.apply(settings.resolutionIndex, settings.fullscreen)
   elseif hit.id == hitIds.BACK then
     OptionsMenu.close()
   end
