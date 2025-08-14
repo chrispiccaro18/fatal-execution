@@ -9,6 +9,7 @@ local LOG_SEVERITY = Const.LOG.SEVERITY
 -- Minimal card instance shape (tighten as card lib stabilizes)
 local CardInstance = T.shape({
   id   = T.str,
+  instanceId = T.str, -- unique per run
   -- name / playEffect / destructorEffect ... can be added later when stable
 }, { __allowUnknown = true })
 
@@ -43,9 +44,6 @@ local ThreatItem = T.shape({
   max      = T.num,
   envEffect = T.nullable(ThreatEnvEffect),
 }, { __allowUnknown = false })
-
--- Destructor deck cards are currently arbitrary tables (keep open)
-local DestructorCard = T.tbl
 
 -- Log items (player-visible by default, with debug allowed)
 local LogItem = T.shape({
@@ -118,6 +116,11 @@ local RNGShape  = T.shape({
   general    = RNGStream,
 }, { __allowUnknown = false })
 
+local idsShape = T.shape({
+  run        = T.str,
+  nextCard   = T.num,
+}, { __allowUnknown = false })
+
 -- Turn state
 local Turn = T.shape({
   phase     = T.enum(TURN_PHASES),
@@ -133,6 +136,8 @@ local ModelSpec = T.shape({
 
   rng         = RNGShape,
 
+  ids         = idsShape,
+
   deck        = T.arr(CardInstance),
   hand        = T.arr(CardInstance),
   handSize    = T.num,
@@ -142,7 +147,7 @@ local ModelSpec = T.shape({
 
   threats     = T.arr(ThreatItem),
 
-  destructorDeck    = T.arr(DestructorCard),
+  destructorDeck    = T.arr(CardInstance),
   destructorNullify = T.num,
 
   ram         = T.num,

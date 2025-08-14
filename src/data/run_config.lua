@@ -17,7 +17,7 @@ local DEFAULTS = {
   shipPresetId = Const.SHIPS.BASE_SHIP.ID,
   deckSpec     = { kind = Const.DECK_SPEC.PRESET, id = Const.DECKS.STARTER, shuffle = true },
   difficulty   = "normal",   -- "easy" | "normal" | "hard" | etc.
-  handSize     = 7,
+  handSize     = 4,
   mods         = {},         -- e.g., { "ironman", "permashuffle" }
 }
 

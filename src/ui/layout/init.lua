@@ -1,5 +1,7 @@
 local cfg        = require("ui.cfg")
 local HandLayout = require("ui.layout.hand")
+local DeckLayout = require("ui.layout.deck")
+local DestructorLayout = require("ui.layout.destructor")
 
 local Layout     = {}
 
@@ -78,10 +80,14 @@ function Layout.compute(W, H)
   relayout(W, H, sections)
 
   local handPanel = sections.play
-  local getHandSlots = function(n) return HandLayout.computeSlots(handPanel, n) end
+  local deckPanel = sections.deck
+  local destructorPanel = sections.destructor
+
   return {
     sections = sections,
-    getHandSlots = getHandSlots
+    getHandSlots = function(n) return HandLayout.computeSlots(handPanel, n) end,
+    getDeckRect = function() return DeckLayout.computeRect(deckPanel) end,
+    getDestructorRect = function() return DestructorLayout.computeRect(destructorPanel) end
   }
 end
 

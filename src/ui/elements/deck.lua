@@ -1,20 +1,16 @@
-local cfg      = require("ui.cfg")
-local lg       = love.graphics
+local DeckLayout = require("ui.layout.deck")
+local cfg        = require("ui.cfg")
+local lg         = love.graphics
 
-local cfgLocal = cfg.deckPanel
-local colors   = cfg.colors
-local fonts    = cfg.fonts
+local cfgLocal   = cfg.deckPanel
+local colors     = cfg.colors
+local fonts      = cfg.fonts
 
-local DeckUI   = {}
+local DeckUI     = {}
 
 function DeckUI.drawDeck(panel, deck)
   local pad   = cfgLocal.pad
-
-  local cardW = cfgLocal.deckW
-  local cardH = cfgLocal.deckH
-  local cardX = panel.x + pad
-  local cardY = panel.y + pad
-  local cardR = { x = cardX, y = cardY, w = cardW, h = cardH }
+  local cardR = DeckLayout.computeRect(panel)
 
   -- background
   lg.setColor(colors.black)
@@ -30,11 +26,11 @@ function DeckUI.drawDeck(panel, deck)
   lg.setColor(1, 1, 1)
   lg.setFont(fonts.big)
   lg.printf(#deck,
-            cardR.x, cardR.y + cardH / 2 - fonts.big:getHeight() / 2,
+            cardR.x, cardR.y + cardR.h / 2 - fonts.big:getHeight() / 2,
             cardR.w, "center")
 
   -- label
-  local labelX = cardR.x + cardW + pad
+  local labelX = cardR.x + cardR.w + pad
   local labelY = panel.y + pad
   lg.setFont(fonts.big)
   lg.printf("CURRENT DECK: " .. #deck,

@@ -34,7 +34,7 @@ end
 -- @param runConfigOpts (table or nil) player-chosen presets/settings
 function Model.new(seed, runConfigOpts)
   seed = seed or os.time()
-
+  local runTag = ("r-%08x"):format(seed)
 
   -- Explicit run configuration (player choices)
   local runConfig      = MakeRunConfig(runConfigOpts)
@@ -45,13 +45,14 @@ function Model.new(seed, runConfigOpts)
   -- Deterministic RNG sub-streams
   local rng            = deriveStreams(seed)
 
+  -- ID GEN
+  local ids   = { run = runTag, nextCard = 0 }
+
   -- Realized game content based on config + rng
-  local deck           = Deck.init(runConfig.deckSpec, rng.deckBuild, false)
   local systems        = Systems.initFromIds(ship.systems)
   local threats        = Threats.initFromIds(ship.threats)
-  local destructorDeck = DestructorDeck.initFromId(ship.destructor_deck)
 
-  return {
+  local m = {
     -- META
     seed               = seed,
     gameVersion        = Version.number or "unknown",
@@ -62,8 +63,11 @@ function Model.new(seed, runConfigOpts)
     -- DETERMINISTIC RNG STREAMS
     rng                = rng,
 
+    -- ID GEN
+    ids                = ids,
+
     -- REALIZED CONTENT
-    deck               = deck,
+    deck               = nil, -- will be initialized later with generated Ids for cards
     hand               = Hand.init(),
     handSize           = runConfig.handSize,
 
@@ -72,7 +76,7 @@ function Model.new(seed, runConfigOpts)
 
     threats            = threats,
 
-    destructorDeck     = destructorDeck,
+    destructorDeck     = nil, -- will be initialized later with generated Ids for cards
     destructorNullify  = 0,
 
     ram                = 0,
@@ -86,6 +90,16 @@ function Model.new(seed, runConfigOpts)
     -- TASKS: resumable gameplay steps (for save-anywhere)
     tasks              = {},
   }
+
+  local function allocCardId()
+    m.ids.nextCard = (m.ids.nextCard or 0) + 1
+    return string.format("%s:c-%06d", m.ids.run, m.ids.nextCard)
+  end
+
+  m.deck = Deck.init(runConfig.deckSpec, rng.deckBuild, allocCardId)
+  m.destructorDeck = DestructorDeck.initFromId(ship.destructor_deck, rng.destructor, allocCardId)
+
+  return m
 end
 
 return Model

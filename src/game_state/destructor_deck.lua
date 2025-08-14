@@ -1,5 +1,7 @@
 local RNG      = require("state.rng")
 local DestructorDeckPresets = require("data.destructor_decks")
+local CardLib = require("game_state.cards")
+
 
 local DestructorDeck = {}
 
@@ -15,8 +17,16 @@ local function shuffledClone(deck, rngStream)
   return out
 end
 
+local function toCards(ids, onlyId, allocator)
+  local cards = {}
+  for i, id in ipairs(ids) do
+    cards[i] = CardLib.instantiate(id, onlyId, allocator)
+  end
+  return cards
+end
+
 -- Build a realized destructor deck from a preset id
-function DestructorDeck.initFromId(deckId, rngStream)
+function DestructorDeck.initFromId(deckId, rngStream, allocCardId)
   local def = assert(DestructorDeckPresets[deckId], "Unknown destructor deck: "..tostring(deckId))
   local cards = {}
   for i,c in ipairs(def.cards or {}) do
@@ -24,7 +34,8 @@ function DestructorDeck.initFromId(deckId, rngStream)
     cards[i] = k
   end
   -- If you want an initial shuffle, do it here:
-  return shuffledClone(cards, rngStream)
+  local shuffled = shuffledClone(cards, rngStream)
+  return toCards(shuffled, false, allocCardId)
 end
 
 -- Draw one from the top (immutable)

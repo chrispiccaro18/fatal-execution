@@ -1,8 +1,6 @@
 local copy = require("util.copy")
 local Deck = require("game_state.deck")
 
--- state.hand, state.deck, drawn = Hand.drawFromDeck(state.hand, state.deck, amount, state.handSize)
-
 local Hand = {}
 
 function Hand.init()
@@ -44,14 +42,43 @@ function Hand.removeCardAt(hand, index)
   return newHand
 end
 
-function Hand.removeById(hand, cardId)
+function Hand.removeById(hand, instanceId)
   local newHand = {}
   for _, card in ipairs(hand) do
-    if card.id ~= cardId then
+    if card.instanceId ~= instanceId then
       newHand[#newHand+1] = card
     end
   end
   return newHand
+end
+
+--- Return a list of instanceIds from the given hand, in order.
+-- @param hand (table) array of card objects (each with .instanceId)
+-- @param excluding (string or table or nil) single id or set of ids to exclude
+function Hand.getCurrentInstanceIds(hand, excluding)
+  local out = {}
+
+  -- Normalize the excluding param into a lookup table
+  local excludeSet = nil
+  if excluding ~= nil then
+    if type(excluding) == "table" then
+      excludeSet = {}
+      for _, id in ipairs(excluding) do
+        excludeSet[id] = true
+      end
+    else
+      -- single id
+      excludeSet = { [excluding] = true }
+    end
+  end
+
+  for _, card in ipairs(hand) do
+    if not excludeSet or not excludeSet[card.instanceId] then
+      out[#out + 1] = card.instanceId
+    end
+  end
+
+  return out
 end
 
 return Hand

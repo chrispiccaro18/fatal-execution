@@ -4,7 +4,7 @@ local immut   = require("util.immut")
 local Effects = {}
 
 -- READ ONLY: Collect active env effects by trigger (systems that are activated + threats with matching trigger)
--- Returns a flat array of { source="Power", kind="system"|"threat", index=idx, effect=envEffect }
+-- Returns a flat array of ctx: { source="Power", kind="system"|"threat", index=idx, effect=envEffect }
 function Effects.collectActive(model, trigger)
   local out = {}
 
@@ -79,11 +79,13 @@ end
 --   { handSize = number, ram = number, threats = array-of-threats }
 -- Returns (newSlices, note)
 -- note can be used for Log and UI { msg = string, tag = string, amount = number, index = number(threat index), source = string, kind = string }
-function Effects.applySlices(slices, effect, ctx)
+function Effects.applySlices(slices, ctx)
   local handSize = slices.handSize
   local ram      = slices.ram
   local threats  = slices.threats
   local note     = nil
+
+  local effect = ctx.effect
 
   if effect.type == Const.EFFECTS.MODIFY_HAND_SIZE then
     local amt = effect.amount or 0

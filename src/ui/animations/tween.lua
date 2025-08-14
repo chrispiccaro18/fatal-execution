@@ -1,3 +1,7 @@
+local Const = require("const")
+local General = require("util.general")
+local TWEENS = Const.UI.TWEENS
+
 local Tween = {}
 Tween.__index = Tween
 
@@ -162,6 +166,66 @@ function Sequence:update(dt)
     end
   end
   return false
+end
+
+local function tweenProgress(tw)
+  local dur = (tw.duration and tw.duration > 0) and tw.duration or 0.1
+  local del = tw.delay or 0
+  local p   = (tw.elapsed - del) / dur
+  return General.clamp(p, 0, 1)
+end
+
+local function tweenRect(tw)
+  local p = General.easeOutCubic(tweenProgress(tw))
+  local r = {
+    x = General.lerp(tw.from.x, tw.to.x, p),
+    y = General.lerp(tw.from.y, tw.to.y, p),
+    w = General.lerp(tw.from.w, tw.to.w, p),
+    h = General.lerp(tw.from.h, tw.to.h, p),
+  }
+  local ang = General.lerp(tw.fromAngle or 0, tw.toAngle or 0, p)
+  return r, ang
+end
+
+local function indexOf(hand, id)
+  for i, c in ipairs(hand) do if c.instanceId == id then return i end end
+end
+
+function Tween.rectForCard(view, cardId, handIndex)
+  for i = #view.active, 1, -1 do
+    local tw = view.active[i]
+    if tw.kind == TWEENS.CARD_FLY and tw.id == cardId then
+      return tweenRect(tw)
+    end
+  end
+  local slots = view.anchors and view.anchors.handSlots
+  if slots then
+    local i = handIndex or indexOf(view.modelHand or {}, cardId) -- optional cache
+    if i and slots[i] then
+      local s = slots[i]
+      return { x = s.x, y = s.y, w = s.w, h = s.h }, (s.angle or 0)
+    end
+  end
+  return { x = 0, y = 0, w = 0, h = 0 }, 0
+end
+
+local function num(x, fallback) return (type(x) == "number") and x or fallback end
+
+function Tween.makeTween(cardId, fromRect, toRect, duration, delay)
+  return {
+    kind      = TWEENS.CARD_FLY,
+    id        = cardId,
+    elapsed   = 0,
+    duration  = num(duration, 0.22),
+    delay     = num(delay, 0.00),
+
+    from      = { x = fromRect.x, y = fromRect.y, w = fromRect.w, h = fromRect.h },
+    to        = { x = toRect.x, y = toRect.y, w = toRect.w, h = toRect.h },
+
+    -- optional angle tween (used by reflow/fan)
+    fromAngle = num(fromRect.angle, 0),
+    toAngle   = num(toRect.angle, 0),
+  }
 end
 
 return Tween

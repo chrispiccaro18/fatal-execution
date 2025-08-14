@@ -51,10 +51,10 @@ local function finalizeOrder(ids, rngStream, shuffleWanted)
   return ordered
 end
 
-local function toCards(ids, onlyId)
+local function toCards(ids, onlyId, allocator)
   local cards = {}
   for i, id in ipairs(ids) do
-    cards[i] = CardLib.instantiate(id, onlyId)
+    cards[i] = CardLib.instantiate(id, onlyId, allocator)
   end
   return cards
 end
@@ -125,8 +125,10 @@ end
 -- @param deckSpec table  See data/run_config.lua shapes
 -- @param rngStream table RNG stream (deterministic); pass model.rng.deckBuild
 -- @param onlyId   bool   If true, create {id=...} only; else full realized cards
-function Deck.init(deckSpec, rngStream, onlyId)
+function Deck.init(deckSpec, rngStream, allocator)
   assert(type(deckSpec) == "table" and deckSpec.kind, "Deck.init: invalid deckSpec")
+
+  local onlyId = false
 
   local kind = deckSpec.kind
   local ids, shuffleWanted
@@ -143,7 +145,7 @@ function Deck.init(deckSpec, rngStream, onlyId)
 
   -- Single place to enforce alwaysFirst + shuffling policy
   local ordered = finalizeOrder(ids, rngStream, shuffleWanted)
-  return toCards(ordered, onlyId)
+  return toCards(ordered, onlyId, allocator)
 end
 
 -- ===== immutable draw ops =====

@@ -11,6 +11,7 @@ local ACTIONS          = Const.DISPATCH_ACTIONS
 local TASKS            = Const.TASKS
 local LOG_OPTS         = Const.LOG
 local EFFECTS_TRIGGERS = Const.EFFECTS_TRIGGERS
+local UI_INTENTS       = Const.UI.INTENTS
 
 local Reducers         = {}
 
@@ -35,6 +36,7 @@ function Reducers.reduce(model, action)
     newModel            = Log.add(newModel, "--- Turn " .. turn.turnCount .. " begins ---")
 
     newModel.ram        = 0
+
     local activeEffects = Effects.collectActive(newModel, EFFECTS_TRIGGERS.BEGIN_TURN)
     if #activeEffects > 0 then
       local slices = {
@@ -46,7 +48,7 @@ function Reducers.reduce(model, action)
 
       for _, ctx in ipairs(activeEffects) do
         local note = nil
-        slices, note = Effects.applySlices(slices, ctx.effect, ctx)
+        slices, note = Effects.applySlices(slices, ctx)
         if note then
           notes[#notes + 1] = {
             entry = note.msg,
@@ -84,8 +86,8 @@ function Reducers.reduce(model, action)
       newTasks[#newTasks + 1] = {
         kind      = TASKS.DEAL_CARDS,
         remaining = need,
-        interval  = 1.0, -- sequential
-        timer     = 0,
+        -- interval  = 1.0, -- sequential
+        -- timer     = 0,
       }
     end
 
@@ -105,14 +107,21 @@ function Reducers.reduce(model, action)
 
     if #drawn > 0 then
       local card = drawn[1]
-      uiIntents[#uiIntents+1] = { kind = "card_draw", card = card }
+      local nCardsInHand = #newHand
+
+      uiIntents[#uiIntents + 1] = {
+        kind = UI_INTENTS.CARD_DRAW,
+        cardInstanceId = card.instanceId,
+        nCardsInHand = nCardsInHand,
+        existingInstanceIds = Hand.getCurrentInstanceIds(newHand, card.instanceId)
+      }
       -- card.selectable = true
-      -- local name = (type(card) == "table" and card.name) or "Unknown Card"
-      -- newModel = Log.add(newModel, ("Drew %s."):format(name), {
-      --   category = LOG_OPTS.CATEGORY.CARD_DRAW,
-      --   severity = LOG_OPTS.SEVERITY.INFO,
-      --   visible  = true,
-      -- })
+      local name = (type(card) == "table" and card.name) or "Unknown Card"
+      newModel = Log.add(newModel, ("Drew %s."):format(name), {
+        category = LOG_OPTS.CATEGORY.CARD_DRAW,
+        severity = LOG_OPTS.SEVERITY.INFO,
+        visible  = true,
+      })
     else
       newModel = Log.add(newModel, "Deck empty: couldn't draw a card.", {
         category = LOG_OPTS.CATEGORY.CARD_DRAW,
@@ -123,9 +132,9 @@ function Reducers.reduce(model, action)
   end
 
   if action.type == ACTIONS.END_TURN then
-    local turn          = copy(newModel.turn)
-    turn.phase          = TURN_PHASES.END_TURN
-    newModel.turn       = turn
+    local turn    = copy(newModel.turn)
+    turn.phase    = TURN_PHASES.END_TURN
+    newModel.turn = turn
 
     print("Ending turn:", turn.turnCount)
   end

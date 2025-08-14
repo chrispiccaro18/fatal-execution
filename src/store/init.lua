@@ -12,8 +12,8 @@ local immut      = require("util.immut")
 local Store      = { model = nil, view = nil }
 
 function Store.bootstrap(modelOrNil)
-  Store.model = modelOrNil or Model.new()
-  Store.view  = UI.init()
+  Store.model        = modelOrNil or Model.new()
+  Store.view         = UI.init()
   Store.view.anchors = Layout.compute(Display.getVirtualSize())
 end
 
@@ -28,22 +28,28 @@ function Store.dispatch(action)
 
   Store.model = newModel
 
-  if uiIntents and #uiIntents > 0 then
-    UI.schedule(Store.view, uiIntents)
-  end
+  if uiIntents and #uiIntents > 0 then UI.schedule(Store.view, uiIntents) end
 end
 
 local lastW, lastH = nil, nil
 function Store.update(dt)
   local W, H = Display.getVirtualSize()
   if W ~= lastW or H ~= lastH then
+    local oldSlots = Store.view.anchors and Store.view.anchors.handSlots -- keep old
+
     Store.view.anchors = Layout.compute(W, H)
     lastW, lastH = W, H
+
+    Store.view.anchors.handSlots = oldSlots or {}
   end
+
   local producedActions, uiIntents = TaskRunner.step(Store.model, Store.view, dt)
   for _, action in ipairs(producedActions) do Store.dispatch(action) end
-  -- if uiIntents and #uiIntents > 0 then UI.schedule(Store.view, uiIntents) end
-  UI.update(Store.view, dt) -- drives animations; sets view.inputLocked as needed
+  if uiIntents and #uiIntents > 0 then UI.schedule(Store.view, uiIntents) end
+
+  UI.ensureHandLayout(Store.view, Store.model.hand, Store.view.anchors)
+
+  UI.update(Store.view, dt)
 end
 
 -- Get the current turn phase or false

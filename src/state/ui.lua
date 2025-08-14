@@ -1,9 +1,11 @@
 local Const = require("const")
-local General = require("util.general")
+local Tween = require("ui.animations.tween")
+local HandUI = require("ui.elements.hand")
 
 local ANIMATION_INTERVALS = Const.UI.ANIM
 local INTENTS = Const.UI.INTENTS
 local TWEENS = Const.UI.TWEENS
+local CARD_STATES = Const.CARD_STATES
 
 local UI = {}
 
@@ -18,37 +20,54 @@ function UI.init()
   }
 end
 
-local function makeTween(cardId, fromRect, toRect, duration, delay)
-  return {
-    kind     = TWEENS.CARD_FLY,
-    id       = cardId,
-    elapsed  = 0,
-    duration = duration,
-    delay    = delay,
-    from     = { x = fromRect.x, y = fromRect.y, w = fromRect.w, h = fromRect.h },
-    to       = { x = toRect.x, y = toRect.y, w = toRect.w, h = toRect.h },
-  }
-end
-
 function UI.schedule(view, intents)
   for _, it in ipairs(intents) do table.insert(view.intents, it) end
 end
 
-local function tweenProgress(tw)
-  local p = (tw.elapsed - tw.delay) / tw.duration
-  return General.clamp(p, 0, 1)
-end
+function UI.ensureHandLayout(view, hand, anchors)
+  if view.inputLocked or (view.active and #view.active > 0) or view._pendingDraw or view._pendingReflow then
+    return false
+  end
 
-local function tweenRect(tw)
-  local p = General.easeOutCubic(tweenProgress(tw))
-  local r = {
-    x = General.lerp(tw.from.x, tw.to.x, p),
-    y = General.lerp(tw.from.y, tw.to.y, p),
-    w = General.lerp(tw.from.w, tw.to.w, p),
-    h = General.lerp(tw.from.h, tw.to.h, p),
-  }
-  local ang = General.lerp(tw.fromAngle or 0, tw.toAngle or 0, p)
-  return r, ang
+  local n = #hand
+  local target = anchors.getHandSlots(n).slots -- authoritative geometry for current state
+
+  -- always keep a table (avoid nil checks elsewhere)
+  anchors.handSlots = anchors.handSlots or {}
+
+  -- First time / empty hand → just set targets and bail
+  if n == 0 then
+    if #anchors.handSlots ~= 0 then anchors.handSlots = {} end
+    return false
+  end
+  if #anchors.handSlots == 0 then
+    anchors.handSlots = target
+    return false
+  end
+
+  -- Same count → consider a reflow (covers handSize changes & mode flip too)
+  if #anchors.handSlots == #target then
+    local old = anchors.handSlots
+    local changed =
+        (old[1].x ~= target[1].x) or
+        (old[#old].x ~= target[#target].x) or
+        ((old[1].angle or 0) ~= (target[1].angle or 0)) or
+        ((old[#old].angle or 0) ~= (target[#target].angle or 0))
+
+    if changed then
+      local ids = {}
+      for i, c in ipairs(hand) do ids[i] = c.instanceId end -- 👈 use instanceId
+      UI.reflowHand(view, old, target, ids)
+      anchors.handSlots = target
+      return true
+    else
+      return false
+    end
+  end
+
+  -- Different count (draw/discard) → snap new targets; individual draw/discard anims will handle motion
+  anchors.handSlots = target
+  return false
 end
 
 function UI.reflowHand(view, fromSlots, toSlots, ids)
@@ -78,25 +97,43 @@ function UI.update(view, dt)
 
   -- 1) Expand one high-level intent when possible
   if #view.intents > 0 and not view.inputLocked and view.anchors then
-    local it = table.remove(view.intents, 1)
+    local uiIntent = table.remove(view.intents, 1)
 
-    if it.kind == "deal_hand" then
+    if uiIntent.kind == INTENTS.CARD_DRAW then
+      -- Expect uiIntent = { kind=CARD_DRAW, cardInstanceId, nCardsInHand, existingInstanceIds }
       view.inputLocked = true
-      -- optional: clear selectability while animating
-      for _, id in ipairs(it.cards) do HandUI.set(id, { phase = "animating", selectable = false }) end
+      -- card.state = CARD_STATES.ANIMATING
+      -- card.selectable = false
+      HandUI.set(uiIntent.cardInstanceId, { state = CARD_STATES.ANIMATING, selectable = false })
+      local oldSlots = view.anchors.handSlots or {}
 
-      -- staggered fan-out from deck -> handSlots[1..N]
-      for i, cardId in ipairs(it.cards) do
-        local slot = view.anchors.handSlots[i]
-        local delay = 0.06 * (i - 1)
-        table.insert(view.active, makeTween(cardId, view.anchors.deckRect, slot, 0.22, delay))
-      end
+      local targetSlots = view.anchors.getHandSlots(uiIntent.nCardsInHand).slots
+      local landingSlot = targetSlots[uiIntent.nCardsInHand]
+
+      local deckR = view.anchors.getDeckRect()
+
+      table.insert(view.active, Tween.makeTween(
+        uiIntent.cardInstanceId,
+        deckR,
+        landingSlot,
+        ANIMATION_INTERVALS.CARD_DRAW_TIME,
+        0
+      ))
+
       -- remember to emit which cards to unlock on completion
-      view._pendingDeal = { kind = "deal_hand", cards = copy(it.cards) }
-    elseif it.kind == "card_fly" then
+      view._pendingDraw = {
+        ids = { uiIntent.cardInstanceId },
+        existingInstanceIds = uiIntent.existingInstanceIds or {},
+        oldSlots = oldSlots,
+        newSlots = targetSlots,
+      }
+    elseif uiIntent.kind == INTENTS.CARD_FLY then
       view.inputLocked = true
-      table.insert(view.active, makeTween(it.cardId, it.fromRect, it.toRect, it.duration or 0.20, it.delay or 0))
-      view._pendingFly = { kind = "card_fly", id = it.cardId }
+      table.insert(view.active, Tween.makeTween(
+        uiIntent.cardId, uiIntent.fromRect, uiIntent.toRect,
+        uiIntent.duration or 0.20, uiIntent.delay or 0
+      ))
+      view._pendingFly = { kind = TWEENS.CARD_FLY, id = uiIntent.cardId }
     end
   end
 
@@ -116,21 +153,62 @@ function UI.update(view, dt)
   if view.inputLocked and #view.active == 0 then
     view.inputLocked = false
 
-    if view._pendingDeal then
-      local payload = view._pendingDeal
-      view._pendingDeal = nil
-      view.doneFlags[payload.kind] = true
-      table.insert(view.signals, { type = "done", kind = payload.kind, payload = payload })
+    -- DRAW DONE?
+    if view._pendingDraw then
+      local pd = view._pendingDraw
+      view._pendingDraw = nil
 
-      -- flip selectability now that animation has ended
-      for _, id in ipairs(payload.cards) do HandUI.set(id, { phase = "idle", selectable = true }) end
-    end
+      -- 1) Flip selectability on the newly drawn card(s)
+      for _, id in ipairs(pd.ids or {}) do
+        HandUI.set(id, { state = CARD_STATES.IDLE, selectable = true })
+      end
 
-    if view._pendingFly then
-      local payload = view._pendingFly
-      view._pendingFly = nil
-      view.doneFlags[payload.kind] = true
-      table.insert(view.signals, { type = "done", kind = payload.kind, payload = payload })
+      -- 2) If geometry changed, schedule reflow for existing cards
+      local old = pd.oldSlots or {}
+      local new = pd.newSlots or {}
+      local needReflow = false
+      if #old == #new and #new > 0 and #(pd.existingInstanceIds or {}) > 0 then
+        -- cheap compare: first/last x or angle changed
+        needReflow =
+            (old[1].x ~= new[1].x) or (old[#old].x ~= new[#new].x) or
+            ((old[1].angle or 0) ~= (new[1].angle or 0)) or
+            ((old[#old].angle or 0) ~= (new[#new].angle or 0))
+      end
+
+      if needReflow then
+        -- 3) Enqueue a tween per existing card id from old[i] -> new[i]
+        for i, id in ipairs(pd.existingInstanceIds) do
+          local from = old[i]
+          local to   = new[i]
+          -- guard: if from/to missing, skip (defensive)
+          if from and to then
+            table.insert(view.active, Tween.makeTween(
+              id,
+              { x = from.x, y = from.y, w = from.w, h = from.h, angle = from.angle or 0 },
+              { x = to.x, y = to.y, w = to.w, h = to.h, angle = to.angle or 0 },
+              0.18, 0.00
+            ))
+          end
+        end
+
+        -- 4) Now that tweens are queued, update target slots
+        view.anchors.handSlots = new
+
+        -- 5) Keep input locked until this reflow finishes
+        view.inputLocked = true
+        view._pendingReflow = { kind = "reflow_hand" }
+      else
+        -- No reflow needed; set targets immediately
+        view.anchors.handSlots = new
+        -- Optionally emit a "draw done" signal
+        view.doneFlags["card_draw_done"] = true
+        table.insert(view.signals, { type = "done", kind = "card_draw_done", payload = { ids = pd.ids } })
+      end
+    elseif view._pendingReflow then
+      -- REFLOW DONE
+      view.doneFlags["reflow_hand"] = true
+      table.insert(view.signals, { type = "done", kind = "reflow_hand" })
+      view._pendingReflow = nil
     end
   end
 end
@@ -142,24 +220,6 @@ function UI.consumeSignals(view)
   local sigs = view.signals
   view.signals = {}
   return sigs
-end
-
--- Where to draw a given card *right now*
--- Falls back to its hand slot if no active tween is running for it.
-function UI.rectForCard(view, cardId, handIndex)
-  -- 1) active tween?
-  for _, tw in ipairs(view.active) do
-    if tw.kind == "card_fly" and tw.id == cardId then
-      return tweenRect(tw)
-    end
-  end
-  -- 2) fall back to anchors.handSlots
-  local slots = view.anchors and view.anchors.handSlots
-  if slots and slots[handIndex] then
-    local s = slots[handIndex]
-    return { x = s.x, y = s.y, w = s.w, h = s.h }, (s.angle or 0)
-  end
-  return { x = 0, y = 0, w = 0, h = 0 }, 0
 end
 
 return UI

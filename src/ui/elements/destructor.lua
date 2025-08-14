@@ -1,4 +1,5 @@
 local Const = require("const")
+local DestructorLayout = require("ui.layout.destructor")
 local cfg              = require("ui.cfg")
 local Card             = require("ui.elements.card")
 local lg               = love.graphics
@@ -10,8 +11,8 @@ local DestructorUI     = {}
 
 function DestructorUI.drawDestructor(panel, destructorDeck, destructorNullify)
   local pad   = cfgLocal.pad
-  local cardW = cfgLocal.cardW
-  local cardH = cfgLocal.cardH
+  local cardR = DestructorLayout.computeRect(panel)
+
   local font = cfgLocal.font
 
   local displayCardOffsetX = cfgLocal.displayCardOffsetX
@@ -24,8 +25,8 @@ function DestructorUI.drawDestructor(panel, destructorDeck, destructorNullify)
   -- Deck base card
   local centerX = panel.x + panel.w / 2
   local centerY = panel.y + panel.h / 2
-  local baseX = centerX - cardW / 2
-  local baseY = centerY - cardH / 2
+  local baseX = centerX - cardR.w / 2
+  local baseY = centerY - cardR.h / 2
 
   local deckSize = #destructorDeck
 
@@ -33,13 +34,13 @@ function DestructorUI.drawDestructor(panel, destructorDeck, destructorNullify)
     -- Case 1: No cards in the queue, draw a rectangle with dotted lines
     lg.setColor(colors.white)
     lg.setLineStyle("rough") -- Dashed line style
-    lg.rectangle("line", baseX, baseY, cardW, cardH)
+    lg.rectangle("line", baseX, baseY, cardR.w, cardR.h)
     lg.setLineStyle("smooth") -- Reset line style
   elseif deckSize == 1 then
     -- Case 2: Only one card in the queue, draw that card
     local card = destructorDeck[1]
     local hasNullify = destructorNullify > 0
-    Card.drawFace(card, baseX, baseY, cardW, cardH, pad, hasNullify)
+    Card.drawFace(card, baseX, baseY, cardR.w, cardR.h, pad, hasNullify)
   else
     local topCard = destructorDeck[1]
 
@@ -51,7 +52,7 @@ function DestructorUI.drawDestructor(panel, destructorDeck, destructorNullify)
 
       local hasNullify = destructorNullify > 0
 
-      Card.drawFace(topCard, previewX, previewY, cardW, cardH, pad, hasNullify)
+      Card.drawFace(topCard, previewX, previewY, cardR.w, cardR.h, pad, hasNullify)
     end
   end
 

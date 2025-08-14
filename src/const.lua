@@ -40,8 +40,8 @@ Const.TASKS                = {
 
 Const.UI                      = {
   ANIM = {
-    DRAW_INTERVAL = 0.12, -- spacing between successive draws
-    DRAW_TIME = 0.25      -- time to draw a single card
+    CARD_DRAW_INTERVAL = 0.5, -- spacing between successive draws
+    CARD_DRAW_TIME = 1.0      -- time to draw a single card
   },
   INTENTS = {
     -- HAND_FILL_BEGIN = "hand_fill_begin",
