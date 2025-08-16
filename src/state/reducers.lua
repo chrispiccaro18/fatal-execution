@@ -4,6 +4,7 @@ local copy             = require("util.copy")
 
 local Log              = require("game_state.log")
 local Hand             = require("game_state.hand")
+local Deck             = require("game_state.deck")
 local Effects          = require("game_state.derived.effects")
 
 local TURN_PHASES      = Const.TURN_PHASES
@@ -12,8 +13,17 @@ local TASKS            = Const.TASKS
 local LOG_OPTS         = Const.LOG
 local EFFECTS_TRIGGERS = Const.EFFECTS_TRIGGERS
 local UI_INTENTS       = Const.UI.INTENTS
+local CARD_STATES      = Const.CARD_STATES
 
 local Reducers         = {}
+
+local function findTask(model, taskId)
+  if not model.tasks then return nil end
+  for _, task in ipairs(model.tasks) do
+    if task.id == taskId then return task end
+  end
+  return nil
+end
 
 function Reducers.reduce(model, action)
   local newModel = copy(model)
@@ -81,13 +91,13 @@ function Reducers.reduce(model, action)
     local have     = #newModel.hand
     local need     = math.max(0, handSize - have)
 
-    -- Queue a small “deal” task that emits one DRAW_CARD per tick
     if need > 0 then
+      local taskId = os.time()
       newTasks[#newTasks + 1] = {
+        id        = taskId,
         kind      = TASKS.DEAL_CARDS,
         remaining = need,
-        -- interval  = 1.0, -- sequential
-        -- timer     = 0,
+        inProgress = false,
       }
     end
 
@@ -95,39 +105,71 @@ function Reducers.reduce(model, action)
   end
 
   if action.type == ACTIONS.DRAW_CARD then
-    local handSize = newModel.handSize
-    local newHand, newDeck, drawn = Hand.drawFromDeck(
-      newModel.hand,
-      newModel.deck,
-      1,
-      handSize
-    )
-    newModel.hand = newHand
-    newModel.deck = newDeck
+    local dealTask = findTask(newModel, action.taskId)
+    assert(dealTask, "DRAW_CARD action requires a valid taskId")
+    dealTask.inProgress = true
 
-    if #drawn > 0 then
-      local card = drawn[1]
-      local nCardsInHand = #newHand
+    local card, newDeck = Deck.draw(newModel.deck)
+    if card then
+      card.state = CARD_STATES.ANIMATING
+      card.selectable = false
+      newModel.animatingCards = newModel.animatingCards or {}
+      newModel.animatingCards[card.instanceId] = card
+      newModel.deck = newDeck
+
+      for _, c in ipairs(newModel.hand) do
+        c.state = CARD_STATES.ANIMATING
+        c.selectable = false
+      end
 
       uiIntents[#uiIntents + 1] = {
-        kind = UI_INTENTS.CARD_DRAW,
-        cardInstanceId = card.instanceId,
-        nCardsInHand = nCardsInHand,
-        existingInstanceIds = Hand.getCurrentInstanceIds(newHand, card.instanceId)
+        kind = UI_INTENTS.ANIMATE_DRAW_AND_REFLOW,
+        newCardInstanceId = card.instanceId,
+        existingInstanceIds = Hand.getCurrentInstanceIds(newModel.hand),
+        finalSlotCount = #newModel.hand + 1,
+        taskId = dealTask.id,
       }
-      -- card.selectable = true
+    else
+      Log.add(newModel, "Deck empty: couldn't draw a card.", {
+        category = LOG_OPTS.CATEGORY.CARD_DRAW,
+        severity = LOG_OPTS.SEVERITY.WARN,
+        visible  = true,
+      })
+      dealTask.remaining = 0
+      dealTask.inProgress = false
+    end
+  end
+
+  if action.type == ACTIONS.FINISH_CARD_DRAW then
+    local id = action.cardInstanceId
+    local card = newModel.animatingCards and newModel.animatingCards[id]
+
+    if card then
+      local newHand = immut.copyArray(newModel.hand)
+      newHand[#newHand + 1] = card
+      newModel = immut.assign(newModel, "hand", newHand)
+
+      local newAnimating = copy(newModel.animatingCards)
+      newAnimating[id] = nil
+      newModel = immut.assign(newModel, "animatingCards", newAnimating)
+
       local name = (type(card) == "table" and card.name) or "Unknown Card"
       newModel = Log.add(newModel, ("Drew %s."):format(name), {
         category = LOG_OPTS.CATEGORY.CARD_DRAW,
         severity = LOG_OPTS.SEVERITY.INFO,
         visible  = true,
       })
-    else
-      newModel = Log.add(newModel, "Deck empty: couldn't draw a card.", {
-        category = LOG_OPTS.CATEGORY.CARD_DRAW,
-        severity = LOG_OPTS.SEVERITY.WARN,
-        visible  = true,
-      })
+
+      for _, c in ipairs(newModel.hand) do
+        c.state = CARD_STATES.IDLE
+        c.selectable = true
+      end
+
+      local dealTask = findTask(newModel, action.taskId)
+      if dealTask then
+        dealTask.remaining = dealTask.remaining - 1
+        dealTask.inProgress = false
+      end
     end
   end
 
@@ -135,7 +177,6 @@ function Reducers.reduce(model, action)
     local turn    = copy(newModel.turn)
     turn.phase    = TURN_PHASES.END_TURN
     newModel.turn = turn
-
     print("Ending turn:", turn.turnCount)
   end
 
@@ -144,12 +185,10 @@ function Reducers.reduce(model, action)
     if handIndex < 1 or handIndex > #newModel.hand then
       error("Invalid hand index: " .. tostring(handIndex))
     end
-
     local card = newModel.hand[handIndex]
     if not card then
       error("No card found at index: " .. tostring(handIndex))
     end
-
     print("Playing card:", card.name)
   end
 
@@ -158,12 +197,10 @@ function Reducers.reduce(model, action)
     if handIndex < 1 or handIndex > #newModel.hand then
       error("Invalid hand index: " .. tostring(handIndex))
     end
-
     local card = newModel.hand[handIndex]
     if not card then
       error("No card found at index: " .. tostring(handIndex))
     end
-
     print("Discarding card:", card.name)
   end
 

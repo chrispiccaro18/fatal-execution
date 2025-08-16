@@ -156,6 +156,8 @@ local ModelSpec = T.shape({
   turn        = Turn,
 
   tasks       = T.arr(T.tbl), -- free-form task payloads
+
+  animatingCards = T.tbl,      -- cards currently being animated
 }, { __allowUnknown = false })
 
 -- Helper to enforce deckSpec discriminated-union at runtime

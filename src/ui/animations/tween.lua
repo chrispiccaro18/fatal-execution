@@ -133,12 +133,14 @@ function Parallel:update(dt)
   local allDone = true
   for _, tw in ipairs(self.children) do
     if not tw.done then
-      local finished = tw:update(dt)
-      -- finished flag unused here; queried via tw.done
+      tw:update(dt)
     end
     if not tw.done then allDone = false end
   end
-  if allDone then self.done = true end
+  if allDone then
+    self.done = true
+    if self.onComplete then self.onComplete() end
+  end
   return self.done
 end
 
@@ -168,44 +170,39 @@ function Sequence:update(dt)
   return false
 end
 
-local function tweenProgress(tw)
-  local dur = (tw.duration and tw.duration > 0) and tw.duration or 0.1
-  local del = tw.delay or 0
-  local p   = (tw.elapsed - del) / dur
-  return General.clamp(p, 0, 1)
-end
-
-local function tweenRect(tw)
-  local p = General.easeOutCubic(tweenProgress(tw))
-  local r = {
-    x = General.lerp(tw.from.x, tw.to.x, p),
-    y = General.lerp(tw.from.y, tw.to.y, p),
-    w = General.lerp(tw.from.w, tw.to.w, p),
-    h = General.lerp(tw.from.h, tw.to.h, p),
-  }
-  local ang = General.lerp(tw.fromAngle or 0, tw.toAngle or 0, p)
-  return r, ang
-end
-
-local function indexOf(hand, id)
-  for i, c in ipairs(hand) do if c.instanceId == id then return i end end
+local function findTweenInGroup(group, cardId)
+  if group.id == cardId then return group end
+  if group.children then
+    for _, child in ipairs(group.children) do
+      local found = findTweenInGroup(child, cardId)
+      if found then return found end
+    end
+  end
+  return nil
 end
 
 function Tween.rectForCard(view, cardId, handIndex)
+  -- An active tween targeting this cardId takes precedence.
   for i = #view.active, 1, -1 do
     local tw = view.active[i]
-    if tw.kind == TWEENS.CARD_FLY and tw.id == cardId then
-      return tweenRect(tw)
+    local found = findTweenInGroup(tw, cardId)
+    if found then
+      local r = found:sample()
+      return r, r.angle or 0
     end
   end
+
+  -- Otherwise, use the static position from the hand layout anchors.
   local slots = view.anchors and view.anchors.handSlots
   if slots then
-    local i = handIndex or indexOf(view.modelHand or {}, cardId) -- optional cache
+    local i = handIndex
     if i and slots[i] then
       local s = slots[i]
       return { x = s.x, y = s.y, w = s.w, h = s.h }, (s.angle or 0)
     end
   end
+
+  -- Fallback
   return { x = 0, y = 0, w = 0, h = 0 }, 0
 end
 

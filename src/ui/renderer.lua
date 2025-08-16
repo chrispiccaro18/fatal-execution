@@ -1,19 +1,40 @@
-local UI           = require("state.ui")
-local SystemsUI    = require("ui.elements.systems")
-local EffectsUI    = require("ui.elements.effects")
-local LogsUI       = require("ui.elements.logs")
-local HandUI       = require("ui.elements.hand")
-local DeckUI       = require("ui.elements.deck")
-local RAMUI        = require("ui.elements.ram")
-local ThreatsUI    = require("ui.elements.threats")
-local DestructorUI = require("ui.elements.destructor")
-local EndTurnUI    = require("ui.elements.end_turn")
-
+local cfg          = require("ui.cfg")
+local Card         = require("ui.elements.card")
 local Click        = require("ui.click")
+local DestructorUI = require("ui.elements.destructor")
+local DeckUI       = require("ui.elements.deck")
+local EffectsUI    = require("ui.elements.effects")
+local EndTurnUI    = require("ui.elements.end_turn")
+local HandUI       = require("ui.elements.hand")
+local LogsUI       = require("ui.elements.logs")
+local RAMUI        = require("ui.elements.ram")
+local SystemsUI    = require("ui.elements.systems")
+local ThreatsUI    = require("ui.elements.threats")
+local Tween        = require("ui.animations.tween")
+local UI           = require("state.ui")
 
 local Renderer     = {}
 
-Renderer.drawUI    = function(model, view)
+local function drawAnimatingCards(view, animatingCards)
+  if not animatingCards then return end
+
+  for id, card in pairs(animatingCards) do
+    -- Use the rectForCard function which can recursively find the tween
+    -- and get its interpolated position.
+    local r, angle = Tween.rectForCard(view, id)
+
+    if r then
+      love.graphics.push()
+      love.graphics.translate(r.x + r.w / 2, r.y + r.h / 2)
+      love.graphics.rotate((angle or 0) * math.pi / 180)
+      love.graphics.translate(-r.w / 2, -r.h / 2)
+      Card.drawFace(card, 0, 0, r.w, r.h, cfg.handPanel.pad)
+      love.graphics.pop()
+    end
+  end
+end
+
+Renderer.drawUI = function(model, view)
   Click.clear()
 
   local anchors = view.anchors
@@ -29,6 +50,8 @@ Renderer.drawUI    = function(model, view)
   ThreatsUI.drawThreats(sections.threats, model.threats)
   DestructorUI.drawDestructor(sections.destructor, model.destructorDeck, model.destructorNullify)
   EndTurnUI.drawEndTurnButton(sections.endTurn)
+
+  drawAnimatingCards(view, model.animatingCards)
 end
 
 return Renderer

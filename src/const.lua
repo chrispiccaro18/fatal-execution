@@ -28,6 +28,7 @@ Const.START_SCREEN_STATES     = {
 Const.DISPATCH_ACTIONS        = {
   BEGIN_TURN = "begin_turn",
   DRAW_CARD = "draw_card",
+  FINISH_CARD_DRAW = "finish_card_draw",
   DISCARD_CARD = "discard_card",
   PLAY_CARD = "play_card",
   END_TURN = "end_turn",
@@ -40,18 +41,17 @@ Const.TASKS                = {
 
 Const.UI                      = {
   ANIM = {
-    CARD_DRAW_INTERVAL = 0.5, -- spacing between successive draws
-    CARD_DRAW_TIME = 1.0      -- time to draw a single card
+    -- CARD_DRAW_INTERVAL = 1, -- spacing between successive draws
+    HAND_REFLOW_TIME = 1,
+    CARD_DRAW_TIME = 1      -- time to draw a single card
   },
   INTENTS = {
-    -- HAND_FILL_BEGIN = "hand_fill_begin",
-    -- HAND_FILL_END = "hand_fill_end",
-    -- ANIMATE_DRAW_CARD = "animate_draw_card",
-    CARD_DRAW = "card_draw",
-    REFLOW_HAND = "reflow_hand"
+    ANIMATE_DRAW_AND_REFLOW = "animate_draw_and_reflow",
   },
   TWEENS = {
-    CARD_FLY = "card_fly"
+    CARD_FLY = "card_fly",
+    CARD_DRAW = "card_draw",
+    CARD_REFLOW = "card_reflow"
   },
   HAND_LAYOUT_MODE = {
     SPACED = "spaced",
