@@ -30,6 +30,7 @@ Const.DISPATCH_ACTIONS        = {
   DRAW_CARD = "draw_card",
   FINISH_CARD_DRAW = "finish_card_draw",
   DISCARD_CARD = "discard_card",
+  FINISH_CARD_DISCARD = "finish_card_discard",
   PLAY_CARD = "play_card",
   END_TURN = "end_turn",
   LOG_DEBUG  = "log_debug",
@@ -37,21 +38,25 @@ Const.DISPATCH_ACTIONS        = {
 
 Const.TASKS                = {
   DEAL_CARDS = "deal_cards",
+  DISCARD_CARD = "discard_card"
 }
 
 Const.UI                      = {
   ANIM = {
     -- CARD_DRAW_INTERVAL = 1, -- spacing between successive draws
     HAND_REFLOW_TIME = 1,
-    CARD_DRAW_TIME = 1.5      -- time to draw a single card
+    CARD_DISCARD_TIME = 1,    -- time to discard a single card, SHOULD BE LESS THAN REFLOW TIME?
+    CARD_DRAW_TIME = 1,      -- time to draw a single card
   },
   INTENTS = {
     ANIMATE_DRAW_AND_REFLOW = "animate_draw_and_reflow",
+    ANIMATE_DISCARD_AND_REFLOW = "animate_discard_and_reflow"
   },
   TWEENS = {
     CARD_FLY = "card_fly",
     CARD_DRAW = "card_draw",
-    CARD_REFLOW = "card_reflow"
+    CARD_REFLOW = "card_reflow",
+    CARD_DISCARD = "card_discard",
   },
   HAND_LAYOUT_MODE = {
     SPACED = "spaced",
@@ -257,6 +262,7 @@ Const.LOG                     =
     GENERAL = "general",
     TASK_DEBUG = "task_debug",
     CARD_DRAW = "card_draw",
+    CARD_DISCARD = "card_discard",
     EFFECT = "effect"
   }
 }

@@ -6,6 +6,7 @@ local deepcopy         = require("util.deepcopy")
 local Log              = require("game_state.log")
 local Hand             = require("game_state.hand")
 local Deck             = require("game_state.deck")
+local DestructorDeck   = require("game_state.destructor_deck")
 local Effects          = require("game_state.derived.effects")
 local AnimatingCards   = require("game_state.temp.animating_cards")
 
@@ -185,6 +186,90 @@ function Reducers.reduce(model, action)
     end
   end
 
+  if action.type == ACTIONS.DISCARD_CARD then
+    local handIndex = action.idx
+    if handIndex < 1 or handIndex > #newModel.hand then
+      error("Invalid hand index: " .. tostring(handIndex))
+    end
+    local card = newModel.hand[handIndex]
+    if not card then
+      error("No card found at index: " .. tostring(handIndex))
+    end
+
+    if card.cost and card.cost > 0 then
+      newModel.ram = newModel.ram + card.cost
+    end
+
+    if card.onDiscard then
+      print("Special Case for " .. card.name)
+      print("onDiscard type " .. card.onDiscard.type)
+    end
+
+    local newAnimatingCards = deepcopy(newModel.animatingCards) or AnimatingCards.empty()
+    for i, c in ipairs(newModel.hand) do
+      c.selectable = false
+      if c.instanceId == card.instanceId then
+        c.state = CARD_STATES.DISCARDING
+      else
+        c.state = CARD_STATES.ANIMATING
+      end
+      newAnimatingCards = AnimatingCards.add(newAnimatingCards, c, i)
+    end
+
+    newAnimatingCards = AnimatingCards.lift(newAnimatingCards, card.instanceId)
+    newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
+
+    local remainingHand = Hand.removeById(newModel.hand, card.instanceId)
+
+    uiIntents[#uiIntents + 1] = {
+      kind = UI_INTENTS.ANIMATE_DISCARD_AND_REFLOW,
+      discardedCardInstanceId = card.instanceId,
+      discardedCardHandIndex = handIndex,
+      remainingHandInstanceIds = Hand.getCurrentInstanceIds(remainingHand),
+      finalSlotCount = #remainingHand,
+    }
+    return newModel, uiIntents, newTasks
+  end
+
+  if action.type == ACTIONS.FINISH_CARD_DISCARD then
+    local discardedCardId = action.discardedCardInstanceId
+    local remainingHandIds = action.remainingHandInstanceIds or {}
+    local newAnimatingCards = deepcopy(newModel.animatingCards)
+
+    -- Finalize state for remaining hand cards
+    for _, cardId in ipairs(remainingHandIds) do
+      newAnimatingCards = AnimatingCards.remove(newAnimatingCards, cardId)
+    end
+
+    -- Finalize state for the discarded card
+    local discardedCard = AnimatingCards.get(newAnimatingCards, discardedCardId)
+    if discardedCard then
+      discardedCard.state = CARD_STATES.IDLE
+      discardedCard.selectable = true
+      local newDestructorDeck = DestructorDeck.addBottom(newModel.destructorDeck, discardedCard)
+      newModel = immut.assign(newModel, "destructorDeck", newDestructorDeck)
+      newAnimatingCards = AnimatingCards.remove(newAnimatingCards, discardedCardId)
+
+      local cardName = discardedCard.name or "Unknown Card"
+      newModel = Log.add(newModel, ("Discarded %s."):format(cardName), {
+        category = LOG_OPTS.CATEGORY.CARD_DISCARD,
+        severity = LOG_OPTS.SEVERITY.INFO,
+        visible  = true,
+      })
+    end
+
+    -- Update the hand by removing the discarded card
+    local newHand = Hand.removeById(newModel.hand, discardedCardId)
+    for _, c in ipairs(newHand) do
+      c.state = CARD_STATES.IDLE
+      c.selectable = true
+    end
+    newModel = immut.assign(newModel, "hand", newHand)
+
+    newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
+    return newModel, uiIntents, newTasks
+  end
+
   if action.type == ACTIONS.END_TURN then
     local turn    = copy(newModel.turn)
     turn.phase    = TURN_PHASES.END_TURN
@@ -202,18 +287,6 @@ function Reducers.reduce(model, action)
       error("No card found at index: " .. tostring(handIndex))
     end
     print("Playing card:", card.name)
-  end
-
-  if action.type == ACTIONS.DISCARD_CARD then
-    local handIndex = action.idx
-    if handIndex < 1 or handIndex > #newModel.hand then
-      error("Invalid hand index: " .. tostring(handIndex))
-    end
-    local card = newModel.hand[handIndex]
-    if not card then
-      error("No card found at index: " .. tostring(handIndex))
-    end
-    print("Discarding card:", card.name)
   end
 
   return newModel, uiIntents, newTasks

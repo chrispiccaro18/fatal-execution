@@ -192,17 +192,8 @@ function Tween.rectForCard(view, cardId)
     end
   end
 
-  -- Otherwise, use the static position from the hand layout anchors.
-  -- local slots = view.anchors and view.anchors.handSlots
-  -- if slots then
-  --   local i = handIndex
-  --   if i and slots[i] then
-  --     local s = slots[i]
-  --     return { x = s.x, y = s.y, w = s.w, h = s.h }, (s.angle or 0)
-  --   end
-  -- end
-
   -- Fallback
+  print("[Tween.rectForCard] Falling back to default")
   return { x = 0, y = 0, w = 0, h = 0 }, 0
 end
 

@@ -32,6 +32,7 @@ function UI.update(view, dt)
       view.inputLocked = true
 
       local currentSlots = deepcopy(view.anchors.handSlots.slots or {})
+      assert(currentSlots, "No current slots found")
       local newSlotsAndMode = view.anchors.getHandSlots(uiIntent.finalSlotCount)
       local newSlots = newSlotsAndMode.slots
       local deckR = view.anchors.getDeckRect()
@@ -49,7 +50,7 @@ function UI.update(view, dt)
       local reflowTweens = {}
       if #uiIntent.existingInstanceIds > 0 then
         for i, id in ipairs(uiIntent.existingInstanceIds) do
-          local from = currentSlots[i]
+          local from = assert(currentSlots[i], "Missing current slot " .. i)
           local to   = newSlots[i]
           if from and to then
             table.insert(reflowTweens, Tween.new({
@@ -79,6 +80,70 @@ function UI.update(view, dt)
           cardInstanceId = uiIntent.newCardInstanceId,
           taskId = uiIntent.taskId,
           existingInstanceIds = uiIntent.existingInstanceIds or {},
+        })
+      end
+
+      table.insert(view.active, masterGroup)
+      view.anchors.handSlots = newSlotsAndMode
+    elseif uiIntent.kind == INTENTS.ANIMATE_DISCARD_AND_REFLOW then
+      view.inputLocked = true
+
+      local currentSlots = deepcopy(view.anchors.handSlots.slots or {})
+      assert(currentSlots, "No current slots found")
+      local newSlotsAndMode = view.anchors.getHandSlots(uiIntent.finalSlotCount)
+      local newSlots = newSlotsAndMode.slots
+
+      local destructorR = view.anchors.getDestructorRect()
+
+      -- create the draw tween for the discarded card
+      local discardTween = Tween.new({
+        from = currentSlots[uiIntent.discardedCardHandIndex],
+        to = destructorR,
+        duration = ANIMATION_INTERVALS.CARD_DISCARD_TIME,
+        id = uiIntent.discardedCardInstanceId,
+        tag = TWEENS.CARD_DISCARD,
+      })
+
+      local reflowTweens = {}
+      if #uiIntent.remainingHandInstanceIds > 0 then
+        local remainingCardIdx = 1
+        for i = 1, #currentSlots do
+          if i ~= uiIntent.discardedCardHandIndex then
+            local cardId = uiIntent.remainingHandInstanceIds[remainingCardIdx]
+            if cardId then
+              local from = currentSlots[i]
+              local to = newSlots[remainingCardIdx]
+              if from and to then
+                table.insert(reflowTweens, Tween.new({
+                  from = { x = from.x, y = from.y, w = from.w, h = from.h, angle = from.angle or 0 },
+                  to = { x = to.x, y = to.y, w = to.w, h = to.h, angle = to.angle or 0 },
+                  duration = ANIMATION_INTERVALS.HAND_REFLOW_TIME,
+                  id = cardId,
+                  tag = TWEENS.CARD_REFLOW,
+                }))
+              end
+              remainingCardIdx = remainingCardIdx + 1
+            end
+          end
+        end
+      end
+
+      -- Create the master animation group
+      local masterGroup
+      if #reflowTweens > 0 then
+        local reflowGroup = Tween.parallel(reflowTweens)
+        masterGroup = Tween.parallel({ reflowGroup, discardTween })
+      else
+        masterGroup = discardTween
+      end
+
+      -- Attach the completion signal
+      masterGroup.onComplete = function()
+        table.insert(view.signals, {
+          type = ACTIONS.FINISH_CARD_DISCARD,
+          discardedCardInstanceId = uiIntent.discardedCardInstanceId,
+          remainingHandInstanceIds = uiIntent.remainingHandInstanceIds,
+          finalSlotCount = uiIntent.finalSlotCount,
         })
       end
 

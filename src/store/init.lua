@@ -15,9 +15,8 @@ local Store      = { model = nil, view = nil }
 function Store.bootstrap(modelOrNil)
   Store.model        = modelOrNil or Model.new()
   Store.view         = UI.init()
+  -- should probably live in UI.init()
   Store.view.anchors = Layout.compute(Display.getVirtualSize())
-  -- on continue, hand is not being drawn
-  print("Current hand size: " .. #Store.model.hand)
   Store.view.anchors.handSlots = Store.view.anchors.getHandSlots(#Store.model.hand)
 end
 
@@ -38,6 +37,7 @@ end
 local lastW, lastH = nil, nil
 function Store.update(dt)
   local W, H = Display.getVirtualSize()
+  -- will figure out a better way to do this
   if W ~= lastW or H ~= lastH then
     print("Store.update: resizing to " .. W .. "x" .. H)
     local oldSlots = Store.view.anchors and Store.view.anchors.handSlots -- keep old
@@ -52,7 +52,6 @@ function Store.update(dt)
   for _, action in ipairs(producedActions) do Store.dispatch(action) end
   if uiIntents and #uiIntents > 0 then UI.schedule(Store.view, uiIntents) end
 
-  -- UI.ensureHandLayout(Store.view, Store.model.hand, Store.view.anchors)
   UI.update(Store.view, dt)
 
   local signals = UI.consumeSignals(Store.view)

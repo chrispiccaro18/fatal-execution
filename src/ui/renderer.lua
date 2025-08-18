@@ -1,39 +1,16 @@
-local cfg          = require("ui.cfg")
-local Card         = require("ui.elements.card")
-local Click        = require("ui.click")
-local DestructorUI = require("ui.elements.destructor")
-local DeckUI       = require("ui.elements.deck")
-local EffectsUI    = require("ui.elements.effects")
-local EndTurnUI    = require("ui.elements.end_turn")
-local HandUI       = require("ui.elements.hand")
-local LogsUI       = require("ui.elements.logs")
-local RAMUI        = require("ui.elements.ram")
-local SystemsUI    = require("ui.elements.systems")
-local ThreatsUI    = require("ui.elements.threats")
-local Tween        = require("ui.animations.tween")
-local AnimatingCards = require("game_state.temp.animating_cards")
--- local UI           = require("state.ui")
+local Click            = require("ui.click")
+local DestructorUI     = require("ui.elements.destructor")
+local DeckUI           = require("ui.elements.deck")
+local EffectsUI        = require("ui.elements.effects")
+local EndTurnUI        = require("ui.elements.end_turn")
+local HandUI           = require("ui.elements.hand")
+local LogsUI           = require("ui.elements.logs")
+local RAMUI            = require("ui.elements.ram")
+local SystemsUI        = require("ui.elements.systems")
+local ThreatsUI        = require("ui.elements.threats")
+local AnimatingCardsUI = require("ui.animations.cards")
 
-local Renderer     = {}
-
-local function drawAnimatingCards(view, animatingCards)
-  if not animatingCards or not animatingCards.order or #animatingCards.order == 0 then return end
-
-  for _, card in AnimatingCards.iter(animatingCards) do
-    -- Use the rectForCard function which can recursively find the tween
-    -- and get its interpolated position.
-    local r, angle = Tween.rectForCard(view, card.instanceId)
-
-    if r and card then
-      love.graphics.push()
-      love.graphics.translate(r.x + r.w / 2, r.y + r.h / 2)
-      love.graphics.rotate((angle or 0) * math.pi / 180)
-      love.graphics.translate(-r.w / 2, -r.h / 2)
-      Card.drawFace(card, 0, 0, r.w, r.h, cfg.handPanel.pad)
-      love.graphics.pop()
-    end
-  end
-end
+local Renderer  = {}
 
 Renderer.drawUI = function(model, view)
   Click.clear()
@@ -49,10 +26,14 @@ Renderer.drawUI = function(model, view)
   DeckUI.drawDeck(sections.deck, model.deck)
   RAMUI.drawRAM(sections.ram, model.ram)
   ThreatsUI.drawThreats(sections.threats, model.threats)
-  DestructorUI.drawDestructor(sections.destructor, model.destructorDeck, model.destructorNullify)
   EndTurnUI.drawEndTurnButton(sections.endTurn)
 
-  drawAnimatingCards(view, model.animatingCards)
+  local isDestructorEmpty = #model.destructorDeck == 0
+  if isDestructorEmpty then DestructorUI.drawDestructor(sections.destructor, model.destructorDeck, model.destructorNullify) end
+
+  AnimatingCardsUI.draw(view, model.animatingCards)
+
+  if not isDestructorEmpty then DestructorUI.drawDestructor(sections.destructor, model.destructorDeck, model.destructorNullify) end
 end
 
 return Renderer

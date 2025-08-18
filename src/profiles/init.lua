@@ -201,6 +201,11 @@ end
 function Profiles.setCurrentRun(index, gameState)
   local p = Profiles._getProfileData(index)
   assert(p, "Profile must exist to setCurrentRun")
+  -- strip transient values from gameState
+  -- local gameStateForSave = deepcopy(gameState)
+  -- gameStateForSave.tasks = nil
+  -- gameStateForSave.animatingCards = nil
+  -- p.currentRun = gameStateForSave
   p.currentRun = gameState
   Profiles.touch(index)
 end
