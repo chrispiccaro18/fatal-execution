@@ -83,6 +83,27 @@ function GameLoop.mousepressed(x, y, button)
   -- end
 end
 
+function GameLoop.mousemoved(x, y)
+  if inputLocked() then return end
+
+  local vx, vy = Display.toVirtual(x, y)
+  local hits = Click.hits(vx, vy)
+  local cardHit = nil
+
+  for _, hit in ipairs(hits) do
+    if hit.id == Const.HIT_IDS.CARD then
+      cardHit = hit
+      break
+    end
+  end
+
+  local newHoveredIndex = cardHit and cardHit.payload.handIndex or nil
+
+  if (Store.model.hoveredHandIndex or -1) ~= (newHoveredIndex or -1) then
+    Store.dispatch({ type = ACTIONS.SET_HOVERED_CARD, handIndex = newHoveredIndex })
+  end
+end
+
 function GameLoop.keypressed(key)
   if Menu.keypressed(key) then return end
   if key == "escape" then

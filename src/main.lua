@@ -105,6 +105,12 @@ function love.mousepressed(x, y, button)
   end
 end
 
+function love.mousemoved(x, y, dx, dy)
+  if CurrentScreen == CURRENT_SCREEN.GAME then
+    GameLoop.mousemoved(x, y, dx, dy)
+  end
+end
+
 function love.keypressed(key)
   if ConfirmDialog.isOpen then
     if ConfirmDialog.keypressed(key) then return end

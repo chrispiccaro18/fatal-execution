@@ -1,6 +1,7 @@
 local Const   = require("const")
 local Tween   = require("ui.animations.tween")
 local deepcopy = require("util.deepcopy")
+local copy     = require("util.copy")
 
 local ANIMATION_INTERVALS = Const.UI.ANIM
 local INTENTS             = Const.UI.INTENTS
@@ -149,6 +150,37 @@ function UI.update(view, dt)
 
       table.insert(view.active, masterGroup)
       view.anchors.handSlots = newSlotsAndMode
+    elseif uiIntent.kind == INTENTS.ANIMATE_CARD_HOVER then
+      local handIndex = uiIntent.handIndex
+      local handSlots = view.anchors.handSlots.slots
+
+      local from = handSlots[handIndex]
+      local to = copy(from)
+      to.y = to.y - 30
+      to.w = to.w * 1.1
+      to.h = to.h * 1.1
+      to.x = to.x - (to.w - from.w) / 2
+
+      table.insert(view.active, Tween.new({
+        from = from,
+        to = to,
+        duration = 1,
+        id = uiIntent.cardInstanceId,
+        tag = "hover_on",
+      }))
+    elseif uiIntent.kind == INTENTS.ANIMATE_CARD_UNHOVER then
+      local handIndex = uiIntent.handIndex
+      local handSlots = view.anchors.handSlots.slots
+
+      local from = Tween.rectForCard(view, uiIntent.cardInstanceId)
+      local to = handSlots[handIndex]
+      table.insert(view.active, Tween.new({
+        from = from,
+        to = to,
+        duration = 1,
+        id = uiIntent.cardInstanceId,
+        tag = "hover_off",
+      }))
     end
   end
 

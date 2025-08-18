@@ -34,6 +34,7 @@ Const.DISPATCH_ACTIONS        = {
   PLAY_CARD = "play_card",
   END_TURN = "end_turn",
   LOG_DEBUG  = "log_debug",
+  SET_HOVERED_CARD = "set_hovered_card",
 }
 
 Const.TASKS                = {
@@ -50,7 +51,9 @@ Const.UI                      = {
   },
   INTENTS = {
     ANIMATE_DRAW_AND_REFLOW = "animate_draw_and_reflow",
-    ANIMATE_DISCARD_AND_REFLOW = "animate_discard_and_reflow"
+    ANIMATE_DISCARD_AND_REFLOW = "animate_discard_and_reflow",
+    ANIMATE_CARD_HOVER = "animate_card_hover",
+    ANIMATE_CARD_UNHOVER = "animate_card_unhover",
   },
   TWEENS = {
     CARD_FLY = "card_fly",

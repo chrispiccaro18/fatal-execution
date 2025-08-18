@@ -26,6 +26,17 @@ function Click.hit(px, py)
   end
 end
 
+function Click.hits(px, py)
+  local results = {}
+  for i = #Click.list, 1, -1 do
+    local h = Click.list[i]
+    if inside(h.rect, px, py) then
+      table.insert(results, h)
+    end
+  end
+  return results
+end
+
 function Click.addButton(id, rect, label, colors, fontSize)
   local lg = love.graphics
 

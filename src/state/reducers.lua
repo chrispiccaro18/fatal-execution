@@ -270,6 +270,49 @@ function Reducers.reduce(model, action)
     return newModel, uiIntents, newTasks
   end
 
+  if action.type == ACTIONS.SET_HOVERED_CARD then
+    local newHoverIndex = action.handIndex
+    local oldHoverIndex = model.hoveredHandIndex
+    if oldHoverIndex == newHoverIndex then
+      return newModel, uiIntents, newTasks -- No change
+    end
+
+    local newAnimatingCards = deepcopy(newModel.animatingCards) or AnimatingCards.empty()
+
+    -- Lower the previously hovered card, if there was one
+    if oldHoverIndex then
+      local oldCard = newModel.hand[oldHoverIndex]
+      if oldCard then
+        newAnimatingCards = AnimatingCards.lower(newAnimatingCards, oldCard.instanceId)
+        uiIntents[#uiIntents + 1] = {
+          kind = UI_INTENTS.ANIMATE_CARD_UNHOVER,
+          cardInstanceId = oldCard.instanceId,
+          handIndex = oldHoverIndex,
+        }
+      else
+        print("No card found at old hover index: " .. tostring(oldHoverIndex))
+      end
+    end
+
+    -- Lift the newly hovered card
+    if newHoverIndex then
+      local newCard = newModel.hand[newHoverIndex]
+      if newCard then
+        newAnimatingCards = AnimatingCards.add(newAnimatingCards, newCard, newHoverIndex)
+        newAnimatingCards = AnimatingCards.lift(newAnimatingCards, newCard.instanceId)
+        uiIntents[#uiIntents + 1] = {
+          kind = UI_INTENTS.ANIMATE_CARD_HOVER,
+          cardInstanceId = newCard.instanceId,
+          handIndex = newHoverIndex,
+        }
+      end
+    end
+
+    newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
+    newModel.hoveredHandIndex = action.handIndex
+    return newModel, uiIntents, newTasks
+  end
+
   if action.type == ACTIONS.END_TURN then
     local turn    = copy(newModel.turn)
     turn.phase    = TURN_PHASES.END_TURN
