@@ -31,8 +31,9 @@ function UI.update(view, dt)
     if uiIntent.kind == INTENTS.ANIMATE_DRAW_AND_REFLOW then
       view.inputLocked = true
 
-      local currentSlots = deepcopy(view.anchors.handSlots or {})
-      local newSlots = view.anchors.getHandSlots(uiIntent.finalSlotCount).slots
+      local currentSlots = deepcopy(view.anchors.handSlots.slots or {})
+      local newSlotsAndMode = view.anchors.getHandSlots(uiIntent.finalSlotCount)
+      local newSlots = newSlotsAndMode.slots
       local deckR = view.anchors.getDeckRect()
 
       -- Create the draw tween for the new card
@@ -76,12 +77,13 @@ function UI.update(view, dt)
         table.insert(view.signals, {
           type = ACTIONS.FINISH_CARD_DRAW,
           cardInstanceId = uiIntent.newCardInstanceId,
-          taskId = uiIntent.taskId
+          taskId = uiIntent.taskId,
+          existingInstanceIds = uiIntent.existingInstanceIds or {},
         })
       end
 
       table.insert(view.active, masterGroup)
-      view.anchors.handSlots = newSlots
+      view.anchors.handSlots = newSlotsAndMode
     end
   end
 

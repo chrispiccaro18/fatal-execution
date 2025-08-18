@@ -1,11 +1,13 @@
 local Const            = require("const")
 local immut            = require("util.immut")
 local copy             = require("util.copy")
+local deepcopy         = require("util.deepcopy")
 
 local Log              = require("game_state.log")
 local Hand             = require("game_state.hand")
 local Deck             = require("game_state.deck")
 local Effects          = require("game_state.derived.effects")
+local AnimatingCards   = require("game_state.temp.animating_cards")
 
 local TURN_PHASES      = Const.TURN_PHASES
 local ACTIONS          = Const.DISPATCH_ACTIONS
@@ -94,9 +96,9 @@ function Reducers.reduce(model, action)
     if need > 0 then
       local taskId = os.time()
       newTasks[#newTasks + 1] = {
-        id        = taskId,
-        kind      = TASKS.DEAL_CARDS,
-        remaining = need,
+        id         = taskId,
+        kind       = TASKS.DEAL_CARDS,
+        remaining  = need,
         inProgress = false,
       }
     end
@@ -111,16 +113,19 @@ function Reducers.reduce(model, action)
 
     local card, newDeck = Deck.draw(newModel.deck)
     if card then
-      card.state = CARD_STATES.ANIMATING
-      card.selectable = false
-      newModel.animatingCards = newModel.animatingCards or {}
-      newModel.animatingCards[card.instanceId] = card
-      newModel.deck = newDeck
-
-      for _, c in ipairs(newModel.hand) do
+      local newAnimatingCards = deepcopy(newModel.animatingCards) or AnimatingCards.empty()
+      for i, c in ipairs(newModel.hand) do
         c.state = CARD_STATES.ANIMATING
         c.selectable = false
+        newAnimatingCards = AnimatingCards.add(newAnimatingCards, c, i)
       end
+
+      card.state = CARD_STATES.ANIMATING
+      card.selectable = false
+      newAnimatingCards = AnimatingCards.add(newAnimatingCards, card, #newModel.hand + 1)
+      newAnimatingCards = AnimatingCards.lift(newAnimatingCards, card.instanceId)
+      newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
+      newModel.deck = newDeck
 
       uiIntents[#uiIntents + 1] = {
         kind = UI_INTENTS.ANIMATE_DRAW_AND_REFLOW,
@@ -141,19 +146,24 @@ function Reducers.reduce(model, action)
   end
 
   if action.type == ACTIONS.FINISH_CARD_DRAW then
-    local id = action.cardInstanceId
-    local card = newModel.animatingCards and newModel.animatingCards[id]
+    local drewCardId = action.cardInstanceId
+    local otherHandCardIds = action.existingInstanceIds or {}
+    local newAnimatingCards = deepcopy(newModel.animatingCards)
 
-    if card then
+    if #otherHandCardIds > 0 then
+      for _, cardInstanceId in ipairs(otherHandCardIds) do
+        newAnimatingCards = AnimatingCards.remove(newAnimatingCards, cardInstanceId)
+      end
+    end
+
+    if drewCardId then
       local newHand = immut.copyArray(newModel.hand)
-      newHand[#newHand + 1] = card
+      local drewCard = AnimatingCards.get(newAnimatingCards, drewCardId)
+      newHand[#newHand + 1] = drewCard
       newModel = immut.assign(newModel, "hand", newHand)
+      newAnimatingCards = AnimatingCards.remove(newAnimatingCards, drewCardId)
 
-      local newAnimating = copy(newModel.animatingCards)
-      newAnimating[id] = nil
-      newModel = immut.assign(newModel, "animatingCards", newAnimating)
-
-      local name = (type(card) == "table" and card.name) or "Unknown Card"
+      local name = (type(drewCard) == "table" and drewCard.name) or "Unknown Card"
       newModel = Log.add(newModel, ("Drew %s."):format(name), {
         category = LOG_OPTS.CATEGORY.CARD_DRAW,
         severity = LOG_OPTS.SEVERITY.INFO,
@@ -164,6 +174,8 @@ function Reducers.reduce(model, action)
         c.state = CARD_STATES.IDLE
         c.selectable = true
       end
+
+      newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
 
       local dealTask = findTask(newModel, action.taskId)
       if dealTask then

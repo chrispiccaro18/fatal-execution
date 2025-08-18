@@ -3,7 +3,7 @@ local Store     = require("store")
 local Profiles  = require("profiles")
 local cfg       = require("ui.cfg")
 local Display   = require("ui.display")
-local Renderer  = require("ui.renderer")
+-- local Renderer  = require("ui.renderer")
 local Click     = require("ui.click")
 local Menu      = require("ui.menus.menu")
 -- local EndGameUI = require("ui.elements.end_game")
@@ -40,7 +40,8 @@ function GameLoop.draw()
   local lg = love.graphics
   lg.setCanvas(Display.canvas)
   lg.clear(cfg.colors.almostBlack[1], cfg.colors.almostBlack[2], cfg.colors.almostBlack[3])
-  Renderer.drawUI(Store.model, Store.view) -- draw from state only
+  Store.draw()
+  -- Renderer.drawUI(Store.model, Store.view) -- draw from state only
   lg.setCanvas()
 
   lg.push()

@@ -4,6 +4,7 @@ local Reducers   = require("state.reducers")
 local TaskRunner = require("state.task_runner")
 local UI         = require("state.ui")
 
+local Renderer   = require("ui.renderer")
 local Layout     = require("ui.layout")
 local Display    = require("ui.display")
 
@@ -58,6 +59,10 @@ function Store.update(dt)
   for _, signal in ipairs(signals) do
     Store.dispatch(signal)
   end
+end
+
+function Store.draw()
+  Renderer.drawUI(Store.model, Store.view)
 end
 
 -- Get the current turn phase or false

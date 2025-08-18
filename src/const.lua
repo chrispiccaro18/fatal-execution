@@ -43,7 +43,7 @@ Const.UI                      = {
   ANIM = {
     -- CARD_DRAW_INTERVAL = 1, -- spacing between successive draws
     HAND_REFLOW_TIME = 1,
-    CARD_DRAW_TIME = 1      -- time to draw a single card
+    CARD_DRAW_TIME = 1.5      -- time to draw a single card
   },
   INTENTS = {
     ANIMATE_DRAW_AND_REFLOW = "animate_draw_and_reflow",

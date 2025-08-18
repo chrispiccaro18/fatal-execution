@@ -181,7 +181,7 @@ local function findTweenInGroup(group, cardId)
   return nil
 end
 
-function Tween.rectForCard(view, cardId, handIndex)
+function Tween.rectForCard(view, cardId)
   -- An active tween targeting this cardId takes precedence.
   for i = #view.active, 1, -1 do
     local tw = view.active[i]
@@ -193,14 +193,14 @@ function Tween.rectForCard(view, cardId, handIndex)
   end
 
   -- Otherwise, use the static position from the hand layout anchors.
-  local slots = view.anchors and view.anchors.handSlots
-  if slots then
-    local i = handIndex
-    if i and slots[i] then
-      local s = slots[i]
-      return { x = s.x, y = s.y, w = s.w, h = s.h }, (s.angle or 0)
-    end
-  end
+  -- local slots = view.anchors and view.anchors.handSlots
+  -- if slots then
+  --   local i = handIndex
+  --   if i and slots[i] then
+  --     local s = slots[i]
+  --     return { x = s.x, y = s.y, w = s.w, h = s.h }, (s.angle or 0)
+  --   end
+  -- end
 
   -- Fallback
   return { x = 0, y = 0, w = 0, h = 0 }, 0
