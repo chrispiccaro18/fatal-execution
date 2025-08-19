@@ -19,18 +19,22 @@ Renderer.drawUI = function(model, view)
   assert(anchors, "[Renderer.drawUI]: No anchors set in view!")
   local sections = anchors.sections
 
+  -- Draw all static UI elements
   SystemsUI.drawSystemsPanel(sections.systems, model.systems, model.currentSystemIndex)
   EffectsUI.drawEffects(sections.effects, model)
   LogsUI.drawLogs(sections.logs, model.log)
-  HandUI.drawHand(view, model.hand)
   DeckUI.drawDeck(sections.deck, model.deck)
   RAMUI.drawRAM(sections.ram, model.ram)
   ThreatsUI.drawThreats(sections.threats, model.threats)
   EndTurnUI.drawEndTurnButton(sections.endTurn)
 
+  -- Draw the hand, which handles all its own internal animations (hover, reflow).
+  HandUI.drawHand(view, model.hand)
+
   local isDestructorEmpty = #model.destructorDeck == 0
   if isDestructorEmpty then DestructorUI.drawDestructor(sections.destructor, model.destructorDeck, model.destructorNullify) end
 
+  -- Draw cards in transit (e.g., deck-to-hand, hand-to-discard)
   AnimatingCardsUI.draw(view, model.animatingCards)
 
   if not isDestructorEmpty then DestructorUI.drawDestructor(sections.destructor, model.destructorDeck, model.destructorNullify) end

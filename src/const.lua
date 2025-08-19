@@ -34,7 +34,6 @@ Const.DISPATCH_ACTIONS        = {
   PLAY_CARD = "play_card",
   END_TURN = "end_turn",
   LOG_DEBUG  = "log_debug",
-  SET_HOVERED_CARD = "set_hovered_card",
 }
 
 Const.TASKS                = {
@@ -45,21 +44,25 @@ Const.TASKS                = {
 Const.UI                      = {
   ANIM = {
     -- CARD_DRAW_INTERVAL = 1, -- spacing between successive draws
-    HAND_REFLOW_TIME = 1,
-    CARD_DISCARD_TIME = 1,    -- time to discard a single card, SHOULD BE LESS THAN REFLOW TIME?
-    CARD_DRAW_TIME = 1,      -- time to draw a single card
+    HAND_REFLOW_TIME = 2,
+    CARD_DISCARD_TIME = 2,    -- time to discard a single card, SHOULD BE LESS THAN REFLOW TIME?
+    CARD_DRAW_TIME = 2,      -- time to draw a single card
+    CARD_HOVER_UP_TIME = 2,
+    CARD_HOVER_DOWN_TIME = 2,
   },
   INTENTS = {
-    ANIMATE_DRAW_AND_REFLOW = "animate_draw_and_reflow",
-    ANIMATE_DISCARD_AND_REFLOW = "animate_discard_and_reflow",
-    ANIMATE_CARD_HOVER = "animate_card_hover",
-    ANIMATE_CARD_UNHOVER = "animate_card_unhover",
+    ANIMATE_DRAW_DECK_TO_HAND = "animate_draw_deck_to_hand",
+    ANIMATE_DISCARD_HAND_TO_DESTRUCTOR = "animate_discard_hand_to_destructor",
+    ANIMATE_HAND_REFLOW = "animate_hand_reflow",
+    SET_HOVERED_CARD = "set_hovered_card",
   },
   TWEENS = {
     CARD_FLY = "card_fly",
     CARD_DRAW = "card_draw",
     CARD_REFLOW = "card_reflow",
     CARD_DISCARD = "card_discard",
+    CARD_HOVER_UP = "card_hover_up",
+    CARD_HOVER_DOWN = "card_hover_down",
   },
   HAND_LAYOUT_MODE = {
     SPACED = "spaced",

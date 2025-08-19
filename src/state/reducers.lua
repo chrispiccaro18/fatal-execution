@@ -114,26 +114,32 @@ function Reducers.reduce(model, action)
 
     local card, newDeck = Deck.draw(newModel.deck)
     if card then
-      local newAnimatingCards = deepcopy(newModel.animatingCards) or AnimatingCards.empty()
-      for i, c in ipairs(newModel.hand) do
-        c.state = CARD_STATES.ANIMATING
+      -- Card is now in transit from deck to hand.
+      local newSlotCount = #newModel.hand + 1
+      local newAnimatingCards = AnimatingCards.add(newModel.animatingCards or AnimatingCards.empty(), card, newSlotCount)
+      newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
+      newModel = immut.assign(newModel, "deck", newDeck)
+
+      card.selectable = false
+      card.state = CARD_STATES.ANIMATING
+
+      for _, c in ipairs(newModel.hand) do
         c.selectable = false
-        newAnimatingCards = AnimatingCards.add(newAnimatingCards, c, i)
+        c.state = CARD_STATES.ANIMATING
       end
 
-      card.state = CARD_STATES.ANIMATING
-      card.selectable = false
-      newAnimatingCards = AnimatingCards.add(newAnimatingCards, card, #newModel.hand + 1)
-      newAnimatingCards = AnimatingCards.lift(newAnimatingCards, card.instanceId)
-      newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
-      newModel.deck = newDeck
+      uiIntents[#uiIntents + 1] = {
+        kind = UI_INTENTS.ANIMATE_DRAW_DECK_TO_HAND,
+        newCardInstanceId = card.instanceId,
+        newSlotCount = newSlotCount,
+        taskId = dealTask.id,
+      }
 
       uiIntents[#uiIntents + 1] = {
-        kind = UI_INTENTS.ANIMATE_DRAW_AND_REFLOW,
-        newCardInstanceId = card.instanceId,
+        kind = UI_INTENTS.ANIMATE_HAND_REFLOW,
         existingInstanceIds = Hand.getCurrentInstanceIds(newModel.hand),
-        finalSlotCount = #newModel.hand + 1,
-        taskId = dealTask.id,
+        finalSlotCount = newSlotCount,
+        excludingIndex = newSlotCount,
       }
     else
       Log.add(newModel, "Deck empty: couldn't draw a card.", {
@@ -148,21 +154,14 @@ function Reducers.reduce(model, action)
 
   if action.type == ACTIONS.FINISH_CARD_DRAW then
     local drewCardId = action.cardInstanceId
-    local otherHandCardIds = action.existingInstanceIds or {}
-    local newAnimatingCards = deepcopy(newModel.animatingCards)
+    local drewCard = AnimatingCards.get(newModel.animatingCards, drewCardId)
 
-    if #otherHandCardIds > 0 then
-      for _, cardInstanceId in ipairs(otherHandCardIds) do
-        newAnimatingCards = AnimatingCards.remove(newAnimatingCards, cardInstanceId)
-      end
-    end
-
-    if drewCardId then
+    if drewCard then
+      -- Card has arrived. Move from animating to hand.
       local newHand = immut.copyArray(newModel.hand)
-      local drewCard = AnimatingCards.get(newAnimatingCards, drewCardId)
       newHand[#newHand + 1] = drewCard
       newModel = immut.assign(newModel, "hand", newHand)
-      newAnimatingCards = AnimatingCards.remove(newAnimatingCards, drewCardId)
+      newModel = immut.assign(newModel, "animatingCards", AnimatingCards.remove(newModel.animatingCards, drewCardId))
 
       local name = (type(drewCard) == "table" and drewCard.name) or "Unknown Card"
       newModel = Log.add(newModel, ("Drew %s."):format(name), {
@@ -172,84 +171,56 @@ function Reducers.reduce(model, action)
       })
 
       for _, c in ipairs(newModel.hand) do
-        c.state = CARD_STATES.IDLE
         c.selectable = true
+        c.state = CARD_STATES.IDLE
       end
+    end
 
-      newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
-
-      local dealTask = findTask(newModel, action.taskId)
-      if dealTask then
-        dealTask.remaining = dealTask.remaining - 1
-        dealTask.inProgress = false
-      end
+    local dealTask = findTask(newModel, action.taskId)
+    if dealTask then
+      dealTask.remaining = dealTask.remaining - 1
+      dealTask.inProgress = false
     end
   end
 
   if action.type == ACTIONS.DISCARD_CARD then
     local handIndex = action.idx
-    if handIndex < 1 or handIndex > #newModel.hand then
-      error("Invalid hand index: " .. tostring(handIndex))
-    end
     local card = newModel.hand[handIndex]
-    if not card then
-      error("No card found at index: " .. tostring(handIndex))
-    end
+    if not card then error("No card at index " .. tostring(handIndex)) end
 
-    if card.cost and card.cost > 0 then
-      newModel.ram = newModel.ram + card.cost
-    end
+    newModel.ram = newModel.ram + card.cost
 
-    if card.onDiscard then
-      print("Special Case for " .. card.name)
-      print("onDiscard type " .. card.onDiscard.type)
-    end
+    -- Card is now in transit from hand to discard.
+    -- 1. Remove from hand
+    local newHand = Hand.removeById(newModel.hand, card.instanceId)
+    newModel = immut.assign(newModel, "hand", newHand)
 
-    local newAnimatingCards = deepcopy(newModel.animatingCards) or AnimatingCards.empty()
-    for i, c in ipairs(newModel.hand) do
-      c.selectable = false
-      if c.instanceId == card.instanceId then
-        c.state = CARD_STATES.DISCARDING
-      else
-        c.state = CARD_STATES.ANIMATING
-      end
-      newAnimatingCards = AnimatingCards.add(newAnimatingCards, c, i)
-    end
-
-    newAnimatingCards = AnimatingCards.lift(newAnimatingCards, card.instanceId)
+    -- 2. Add to animatingCards
+    local newAnimatingCards = AnimatingCards.add(newModel.animatingCards or AnimatingCards.empty(), card, handIndex) -- handIndex is irrelevant here
     newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
 
-    local remainingHand = Hand.removeById(newModel.hand, card.instanceId)
-
+    -- 3. Create UI intents for the two separate animations
     uiIntents[#uiIntents + 1] = {
-      kind = UI_INTENTS.ANIMATE_DISCARD_AND_REFLOW,
+      kind = UI_INTENTS.ANIMATE_DISCARD_HAND_TO_DESTRUCTOR,
       discardedCardInstanceId = card.instanceId,
       discardedCardHandIndex = handIndex,
-      remainingHandInstanceIds = Hand.getCurrentInstanceIds(remainingHand),
-      finalSlotCount = #remainingHand,
     }
-    return newModel, uiIntents, newTasks
+    uiIntents[#uiIntents + 1] = {
+      kind = UI_INTENTS.ANIMATE_HAND_REFLOW,
+      existingInstanceIds = Hand.getCurrentInstanceIds(newModel.hand),
+      finalSlotCount = #newHand,
+    }
   end
 
   if action.type == ACTIONS.FINISH_CARD_DISCARD then
     local discardedCardId = action.discardedCardInstanceId
-    local remainingHandIds = action.remainingHandInstanceIds or {}
-    local newAnimatingCards = deepcopy(newModel.animatingCards)
+    local discardedCard = AnimatingCards.get(newModel.animatingCards, discardedCardId)
 
-    -- Finalize state for remaining hand cards
-    for _, cardId in ipairs(remainingHandIds) do
-      newAnimatingCards = AnimatingCards.remove(newAnimatingCards, cardId)
-    end
-
-    -- Finalize state for the discarded card
-    local discardedCard = AnimatingCards.get(newAnimatingCards, discardedCardId)
     if discardedCard then
-      discardedCard.state = CARD_STATES.IDLE
-      discardedCard.selectable = true
+      -- Card has arrived. Move from animating to destructor deck.
       local newDestructorDeck = DestructorDeck.addBottom(newModel.destructorDeck, discardedCard)
       newModel = immut.assign(newModel, "destructorDeck", newDestructorDeck)
-      newAnimatingCards = AnimatingCards.remove(newAnimatingCards, discardedCardId)
-
+      newModel = immut.assign(newModel, "animatingCards", AnimatingCards.remove(newModel.animatingCards, discardedCardId))
       local cardName = discardedCard.name or "Unknown Card"
       newModel = Log.add(newModel, ("Discarded %s."):format(cardName), {
         category = LOG_OPTS.CATEGORY.CARD_DISCARD,
@@ -257,79 +228,6 @@ function Reducers.reduce(model, action)
         visible  = true,
       })
     end
-
-    -- Update the hand by removing the discarded card
-    local newHand = Hand.removeById(newModel.hand, discardedCardId)
-    for _, c in ipairs(newHand) do
-      c.state = CARD_STATES.IDLE
-      c.selectable = true
-    end
-    newModel = immut.assign(newModel, "hand", newHand)
-
-    newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
-    return newModel, uiIntents, newTasks
-  end
-
-  if action.type == ACTIONS.SET_HOVERED_CARD then
-    local newHoverIndex = action.handIndex
-    local oldHoverIndex = model.hoveredHandIndex
-    if oldHoverIndex == newHoverIndex then
-      return newModel, uiIntents, newTasks -- No change
-    end
-
-    local newAnimatingCards = deepcopy(newModel.animatingCards) or AnimatingCards.empty()
-
-    -- Lower the previously hovered card, if there was one
-    if oldHoverIndex then
-      local oldCard = newModel.hand[oldHoverIndex]
-      if oldCard then
-        newAnimatingCards = AnimatingCards.lower(newAnimatingCards, oldCard.instanceId)
-        uiIntents[#uiIntents + 1] = {
-          kind = UI_INTENTS.ANIMATE_CARD_UNHOVER,
-          cardInstanceId = oldCard.instanceId,
-          handIndex = oldHoverIndex,
-        }
-      else
-        print("No card found at old hover index: " .. tostring(oldHoverIndex))
-      end
-    end
-
-    -- Lift the newly hovered card
-    if newHoverIndex then
-      local newCard = newModel.hand[newHoverIndex]
-      if newCard then
-        newAnimatingCards = AnimatingCards.add(newAnimatingCards, newCard, newHoverIndex)
-        newAnimatingCards = AnimatingCards.lift(newAnimatingCards, newCard.instanceId)
-        uiIntents[#uiIntents + 1] = {
-          kind = UI_INTENTS.ANIMATE_CARD_HOVER,
-          cardInstanceId = newCard.instanceId,
-          handIndex = newHoverIndex,
-        }
-      end
-    end
-
-    newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
-    newModel.hoveredHandIndex = action.handIndex
-    return newModel, uiIntents, newTasks
-  end
-
-  if action.type == ACTIONS.END_TURN then
-    local turn    = copy(newModel.turn)
-    turn.phase    = TURN_PHASES.END_TURN
-    newModel.turn = turn
-    print("Ending turn:", turn.turnCount)
-  end
-
-  if action.type == ACTIONS.PLAY_CARD then
-    local handIndex = action.idx
-    if handIndex < 1 or handIndex > #newModel.hand then
-      error("Invalid hand index: " .. tostring(handIndex))
-    end
-    local card = newModel.hand[handIndex]
-    if not card then
-      error("No card found at index: " .. tostring(handIndex))
-    end
-    print("Playing card:", card.name)
   end
 
   return newModel, uiIntents, newTasks

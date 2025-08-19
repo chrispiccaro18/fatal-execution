@@ -34,6 +34,10 @@ function Store.dispatch(action)
   if uiIntents and #uiIntents > 0 then UI.schedule(Store.view, uiIntents) end
 end
 
+function Store.scheduleIntent(intent)
+  UI.schedule(Store.view, { intent })
+end
+
 local lastW, lastH = nil, nil
 function Store.update(dt)
   local W, H = Display.getVirtualSize()
