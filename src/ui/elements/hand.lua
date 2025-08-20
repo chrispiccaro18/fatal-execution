@@ -2,7 +2,7 @@ local Const = require("const")
 local cfg   = require("ui.cfg")
 local UI    = require("state.ui")
 local Click = require("ui.click")
-local Card  = require("ui.elements.card") -- This require is necessary
+local Card  = require("ui.elements.card")
 
 local HandUI = {}
 
@@ -26,44 +26,50 @@ local function drawCard(view, card, handIndex)
   end
 end
 
-local function getDrawOrder(view, hand)
-  local order = {}
-  local hoveredIndex = view.hover.currentHandIndex
-  local animating = {}
+-- local function getDrawOrder(view, hand)
+--   local order = {}
+--   local hoveredIndex = view.hover.currentHandIndex
+--   local animating = {}
 
-  -- Collect animating indices
-  for i, _ in pairs(view.hover.animating or {}) do
-    animating[i] = true
-  end
+--   -- Collect animating indices
+--   for i, _ in pairs(view.hover.animating or {}) do
+--     animating[i] = true
+--   end
 
-  -- 1. Statics: not animating, not hovered
-  for i = 1, #hand do
-    if not animating[i] and i ~= hoveredIndex then
-      table.insert(order, i)
-    end
-  end
+--   -- 1. Statics: not animating, not hovered
+--   for i = 1, #hand do
+--     if not animating[i] and i ~= hoveredIndex then
+--       table.insert(order, i)
+--     end
+--   end
 
-  -- 2. Animating
-  for i, _ in pairs(view.hover.animating or {}) do
-    table.insert(order, i)
-  end
+--   -- 2. Animating
+--   for i, _ in pairs(view.hover.animating or {}) do
+--     table.insert(order, i)
+--   end
 
-  -- 3. Hovered
-  if hoveredIndex then
-    table.insert(order, hoveredIndex)
-  end
+--   -- 3. Hovered
+--   if hoveredIndex then
+--     table.insert(order, hoveredIndex)
+--   end
 
-  return order
-end
+--   return order
+-- end
 
 function HandUI.drawHand(view, hand)
   if not hand then return end
 
-  local drawOrder = getDrawOrder(view, hand)
-  for _, i in ipairs(drawOrder) do
-    local card = hand[i]
-    if card then
+  -- local drawOrder = getDrawOrder(view, hand)
+  for i, card in ipairs(hand) do
+    if i ~= view.hover.currentHandIndex then
       drawCard(view, card, i)
+    end
+  end
+
+  if view.hover.currentHandIndex then
+    local card = hand[view.hover.currentHandIndex]
+    if card then
+      drawCard(view, card, view.hover.currentHandIndex)
     end
   end
 end

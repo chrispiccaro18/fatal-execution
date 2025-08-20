@@ -4,6 +4,7 @@ local Deck       = require("game_state.deck")
 local Log        = require("game_state.log")
 
 local TASKS      = Const.TASKS
+local UI_INTENTS = Const.UI.INTENTS
 local ACTIONS    = Const.DISPATCH_ACTIONS
 local LOG_OPTS   = Const.LOG
 
@@ -22,8 +23,12 @@ function TaskRunner.step(model, view, dt)
     if not task.inProgress then
       if task.kind == TASKS.DEAL_CARDS then
         if task.remaining > 0 then
+          if view and view.lockedTasks and not view.lockedTasks[task.id] then
+            ui[#ui + 1] = { kind = UI_INTENTS.LOCK_UI_FOR_TASK, taskId = task.id }
+          end
           produced[#produced + 1] = { type = ACTIONS.DRAW_CARD, taskId = task.id }
         elseif task.remaining <= 0 then
+          ui[#ui + 1] = { kind = UI_INTENTS.UNLOCK_UI_FOR_TASK, taskId = task.id }
           table.remove(model.tasks, 1)
         end
       -- elseif task.kind == TASKS.DISCARD_CARD then

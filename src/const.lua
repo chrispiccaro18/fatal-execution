@@ -44,17 +44,19 @@ Const.TASKS                = {
 Const.UI                      = {
   ANIM = {
     -- CARD_DRAW_INTERVAL = 1, -- spacing between successive draws
-    HAND_REFLOW_TIME = 1,
-    CARD_DISCARD_TIME = 1,    -- time to discard a single card, SHOULD BE LESS THAN REFLOW TIME?
-    CARD_DRAW_TIME = 1,      -- time to draw a single card
-    CARD_HOVER_UP_TIME = 1,
-    CARD_HOVER_DOWN_TIME = 1,
+    HAND_REFLOW_TIME = .75,
+    CARD_DISCARD_TIME = .75,    -- time to discard a single card, SHOULD BE LESS THAN REFLOW TIME?
+    CARD_DRAW_TIME = .75,      -- time to draw a single card
+    CARD_HOVER_UP_TIME = 0.1,
+    CARD_HOVER_DOWN_TIME = 0.5,
   },
   INTENTS = {
     ANIMATE_DRAW_DECK_TO_HAND = "animate_draw_deck_to_hand",
     ANIMATE_DISCARD_HAND_TO_DESTRUCTOR = "animate_discard_hand_to_destructor",
     ANIMATE_HAND_REFLOW = "animate_hand_reflow",
     SET_HOVERED_CARD = "set_hovered_card",
+    LOCK_UI_FOR_TASK = "lock_ui_for_task",
+    UNLOCK_UI_FOR_TASK = "unlock_ui_for_task",
   },
   TWEENS = {
     CARD_FLY = "card_fly",

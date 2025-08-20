@@ -87,7 +87,8 @@ function Layout.compute(W, H)
     sections = sections,
     getHandSlots = function(n) return HandLayout.computeSlots(handPanel, n) end,
     getDeckRect = function() return DeckLayout.computeRect(deckPanel) end,
-    getDestructorRect = function() return DestructorLayout.computeRect(destructorPanel) end
+    getDestructorRect = function() return DestructorLayout.computeRect(destructorPanel) end,
+    getHoverOffsets = function(handSlots, hoveredIndex) return HandLayout.computeHoverOffsets(handSlots, hoveredIndex) end
   }
 end
 

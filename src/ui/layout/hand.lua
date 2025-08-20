@@ -101,4 +101,61 @@ function LayoutHand.computeSlots(panel, n)
   return { mode = MODE.FAN, slots = slots }
 end
 
+-- Returns per-slot x-offsets (pixels) to apply when a slot is hovered.
+-- handSlots = { mode=..., slots={ {x,y,w,h,angle,z}, ... } }
+-- hoveredIndex = index of hovered card (1..n) or nil
+function LayoutHand.computeHoverOffsets(handSlots, hoveredIndex)
+  local mode  = handSlots.mode
+  local slots = handSlots.slots
+  local n     = #slots
+  if not hoveredIndex or n <= 1 then return {} end
+  if mode == MODE.SPACED then return {} end  -- no need to spread when fully spaced
+
+  local C         = cfg.handPanel
+  local cardW     = C.cardW
+  local maxSpacing= C.maxSpacingX
+
+  -- local step around hovered index (x delta between neighbors)
+  local function stepAt(i)
+    if i < 1 or i >= n then
+      return (n >= 2) and (slots[2].x - slots[1].x) or cardW
+    end
+    return slots[i + 1].x - slots[i].x
+  end
+
+  local baseLeft  = stepAt(hoveredIndex - 1)
+  local baseRight = stepAt(hoveredIndex)
+  local targetGap = cardW + maxSpacing                  -- make neighbors adjacent to hovered
+  local deltaL    = math_max(0, targetGap - baseLeft)   -- extra gap needed on the left side
+  local deltaR    = math_max(0, targetGap - baseRight)  -- extra gap needed on the right side
+  local delta     = math_max(deltaL, deltaR)
+  if delta <= 0 then return {} end
+
+  -- Decay: larger hands → stronger falloff (affects fewer distant cards)
+  local baseDecay = (mode == MODE.FAN) and 0.55 or 0.60
+  local decay     = clamp(baseDecay - 0.02 * (n - 5), 0.25, 0.70)
+
+  local offsets = {}
+  for i = 1, n do offsets[i] = 0 end
+
+  -- Push right side outwards
+  for i = hoveredIndex + 1, n do
+    local dist = i - hoveredIndex
+    offsets[i] = offsets[i] + (delta * (decay ^ (dist - 1)))
+  end
+  -- Push left side outwards
+  for i = hoveredIndex - 1, 1, -1 do
+    local dist = hoveredIndex - i
+    offsets[i] = offsets[i] - (delta * (decay ^ (dist - 1)))
+  end
+
+  -- Keep the overall center stable
+  local sum = 0
+  for i = 1, n do sum = sum + offsets[i] end
+  local centerShift = sum / n
+  for i = 1, n do offsets[i] = offsets[i] - centerShift end
+
+  return offsets
+end
+
 return LayoutHand

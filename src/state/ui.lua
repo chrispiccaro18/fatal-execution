@@ -1,6 +1,7 @@
 local Const               = require("const")
 local Tween               = require("ui.animations.tween")
 local deepcopy            = require("util.deepcopy")
+local General             = require("util.general")
 
 local ANIMATION_INTERVALS = Const.UI.ANIM
 local INTENTS             = Const.UI.INTENTS
@@ -18,9 +19,11 @@ function UI.init()
       currentHandIndex = nil,
       currentInstanceId = nil,
       animating = {},
+      spreadPx = Const.CARD_WIDTH / 4,
     },
     handAnimations = {}, -- For hand-internal animations (reflow)
     signals        = {},
+    lockedTasks    = {},
   }
 end
 
@@ -40,8 +43,32 @@ function UI.getCardHoverOffset(slot)
   -- return to
 end
 
+function UI.getSpreadRect(view, handIndex, offsets)
+  local base = view.anchors.handSlots.slots[handIndex]
+  if not base or not offsets[handIndex] then return base end
+  -- local dir = handIndex < hoveredIndex and -1 or 1
+  -- local spread = view.hover.spreadPx
+  local r = deepcopy(base)
+  if r then
+    r.x = r.x + (offsets[handIndex] or 0)
+  end
+
+  local playPanel = view.anchors and view.anchors.sections and view.anchors.sections.play
+  if playPanel and r then
+    local minX = playPanel.x
+    local maxX = playPanel.x + playPanel.w - r.w
+    r.x = General.clamp(r.x, minX, maxX)
+  end
+  return r
+end
+
 -- The single source of truth for a card's position *within the hand*.
 function UI.getCardInHandRect(view, handIndex)
+  -- Guard: require anchors/slots
+  if not view or not view.anchors or not view.anchors.handSlots or not view.anchors.handSlots.slots then
+    return nil
+  end
+
   -- Priority 1: Is there a hand-specific animation (reflow) running?
   if view.handAnimations[handIndex] then
     return view.handAnimations[handIndex]:sample()
@@ -49,12 +76,21 @@ function UI.getCardInHandRect(view, handIndex)
   elseif view.hover.animating[handIndex] then
     return view.hover.animating[handIndex]:sample()
     -- Priority 3: Is this card the CURRENTLY hovered card (static and raised)?
-  elseif view.hover.currentHandIndex == handIndex then
-    local slot = view.anchors.handSlots.slots[handIndex]
-    return UI.getCardHoverOffset(slot)
+  elseif view.hover.currentHandIndex and not view.inputLocked then
+    local hovered = view.hover.currentHandIndex
+    if handIndex == hovered then
+      local slot = view.anchors.handSlots.slots[handIndex]
+      if not slot then return nil end
+      return UI.getCardHoverOffset(slot)
+    else
+      if not view.anchors.getHoverOffsets then
+        return view.anchors.handSlots.slots[handIndex]
+      end
+      local offsets = view.anchors.getHoverOffsets(view.anchors.handSlots, hovered)
+      return UI.getSpreadRect(view, handIndex, offsets)
+    end
     -- Priority 4: Default to its static slot in the hand.
   else
-    -- print("Should be here")
     return view.anchors.handSlots.slots[handIndex]
   end
 end
@@ -64,7 +100,6 @@ function UI.schedule(view, intents)
 end
 
 function UI.update(view, dt)
-  -- Process one intent per frame.
   while #view.intents > 0 do
     local uiIntent = table.remove(view.intents, 1)
 
@@ -74,11 +109,18 @@ function UI.update(view, dt)
       if newHoverIndex ~= view.hover.currentHandIndex then
         local oldHoverIndex = view.hover.currentHandIndex
         local oldHoverInstanceId = view.hover.currentInstanceId
+        local slots = view.anchors.handSlots.slots
+        local slotCount = #slots
+
+        local fromByIndex = {}
+        for i = 1, slotCount do
+          fromByIndex[i] = UI.getCardInHandRect(view, i)
+        end
+
         if oldHoverIndex then
-          local from = UI.getCardInHandRect(view, oldHoverIndex)
-          local to = view.anchors.handSlots.slots[oldHoverIndex]
+          local to = slots[oldHoverIndex]
           view.hover.animating[oldHoverIndex] = Tween.new({
-            from = from,
+            from = fromByIndex[oldHoverIndex],
             to = to,
             id = oldHoverInstanceId,
             duration = ANIMATION_INTERVALS.CARD_HOVER_DOWN_TIME,
@@ -89,10 +131,41 @@ function UI.update(view, dt)
         view.hover.currentHandIndex = newHoverIndex
         view.hover.currentInstanceId = uiIntent.cardInstanceId
 
+        if not view.inputLocked then
+          local offsets = {}
+          if newHoverIndex then
+            offsets = view.anchors.getHoverOffsets(view.anchors.handSlots, newHoverIndex)
+          end
+
+          for i = 1, slotCount do
+            if i ~= newHoverIndex then
+              local to
+              if newHoverIndex then
+                to = UI.getSpreadRect(view, i, offsets)
+              else
+                to = slots[i]
+              end
+              local from = fromByIndex[i]
+              if from and to then
+                view.hover.animating[i] = Tween.new({
+                  from = from,
+                  to = to,
+                  -- id = uiIntent.cardInstanceId,
+                  duration = ANIMATION_INTERVALS.HAND_REFLOW_TIME,
+                  tag = TWEENS.CARD_REFLOW,
+                })
+              else
+                view.hover.animating[i] = nil
+                print("Warning: from or to is nil for hand index " .. i)
+              end
+            end
+          end
+        end
+
         if newHoverIndex then
           local newCardInstanceId = uiIntent.cardInstanceId
-          local from = UI.getCardInHandRect(view, newHoverIndex)
-          local to = UI.getCardHoverOffset(view.anchors.handSlots.slots[newHoverIndex])
+          local from = fromByIndex[newHoverIndex]
+          local to = UI.getCardHoverOffset(slots[newHoverIndex])
           view.hover.animating[newHoverIndex] = Tween.new({
             from = from,
             to = to,
@@ -151,7 +224,7 @@ function UI.update(view, dt)
     elseif uiIntent.kind == INTENTS.ANIMATE_HAND_REFLOW then
       view.inputLocked = true
       view.handAnimations = {}
-      
+
       local newSlotCount = uiIntent.newSlotCount
       local oldSlotCount = uiIntent.oldSlotCount
       local holeIndex = uiIntent.holeIndex
@@ -159,6 +232,12 @@ function UI.update(view, dt)
 
       -- Capture old layout to use as stable "from" positions
       local oldSlots = view.anchors.handSlots.slots
+      local fromByIndex = {}
+      for i = 1, oldSlotCount do
+        if oldSlots[i] then fromByIndex[i] = deepcopy(oldSlots[i]) else fromByIndex[i] = nil end
+      end
+
+      view.handAnimations = {}
 
       local newSlotsAndMode = view.anchors.getHandSlots(newSlotCount)
       local newSlots = newSlotsAndMode.slots
@@ -179,7 +258,7 @@ function UI.update(view, dt)
           oldSlotIndex = oldSlotIndex + 1
         else
           -- Move card from old slot -> new slot
-          local from = oldSlots[oldSlotIndex]
+          local from = fromByIndex[oldSlotIndex]
           local to = newSlots[newSlotIndex]
 
           if from and to then
@@ -216,6 +295,11 @@ function UI.update(view, dt)
       end
 
       view.anchors.handSlots = newSlotsAndMode
+    elseif uiIntent.kind == INTENTS.LOCK_UI_FOR_TASK then
+      view.lockedTasks[uiIntent.taskId] = true
+      view.inputLocked = true
+    elseif uiIntent.kind == INTENTS.UNLOCK_UI_FOR_TASK then
+      view.lockedTasks[uiIntent.taskId] = nil
     end
   end
 
@@ -230,9 +314,10 @@ function UI.update(view, dt)
     if view.active[i]:update(dt) then table.remove(view.active, i) end
   end
 
-  -- Unlock when all animations are done
+  -- Unlock when all animations are done AND no task-based locks remain
   local handAnimEmpty = next(view.handAnimations) == nil
-  if view.inputLocked and #view.active == 0 and handAnimEmpty then
+  local lockedTasksEmpty = next(view.lockedTasks) == nil
+  if view.inputLocked and #view.active == 0 and handAnimEmpty and lockedTasksEmpty then
     view.inputLocked = false
   end
 end

@@ -11,7 +11,7 @@ local ACTIONS             = Const.DISPATCH_ACTIONS
 
 local GameLoop            = {}
 GameLoop.profileIndex     = nil
-GameLoop.lastHoveredIndex = nil -- Debounce hover events
+GameLoop.lastHoveredIndex = nil
 GameLoop.lastInputLocked  = false
 GameLoop.pendingHoverRescanFrames = 0
 

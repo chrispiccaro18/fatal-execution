@@ -93,7 +93,14 @@ return {
     cardH         = Const.CARD_HEIGHT,
     maxSpacingX   = 10, -- max spacing between cards
     minVisiblePx  = Const.CARD_WIDTH / 4, -- when overlapping, how much of next card is visible
-    fanThresholdN = 6, -- switch to fan at/after this many cards
+    fanThresholdN = 2, -- switch to fan at/after this many cards
+    angleSpanDeg  = 8, -- -- total span from left to right (e.g., -4..+4)
+    hove          = {
+      liftHoveredPx = 30,
+      liftNeighborPx = 16,
+      neighborSpreadPx = 12,
+      scaleHovered = 1.08,
+    },
     fan           = {
       enabled     = true,
       maxAngleDeg = 12, -- max tip on edges
