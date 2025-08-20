@@ -194,7 +194,8 @@ function Tween.rectForCard(view, cardId)
 
   -- Fallback
   print("[Tween.rectForCard] Falling back to default")
-  return { x = 0, y = 0, w = 0, h = 0 }, 0
+  print("[Tween.rectForCard] CardId:", cardId)
+  return { x = 0, y = 0, w = 0, h = 0 }, 0, true
 end
 
 local function num(x, fallback) return (type(x) == "number") and x or fallback end

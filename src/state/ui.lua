@@ -69,38 +69,41 @@ function UI.update(view, dt)
     local uiIntent = table.remove(view.intents, 1)
 
     if uiIntent.kind == INTENTS.SET_HOVERED_CARD then
-      view.inputLocked = false
+      -- view.inputLocked = false
       local newHoverIndex = uiIntent.handIndex
-      if newHoverIndex == view.hover.currentHandIndex then return end
+      if newHoverIndex ~= view.hover.currentHandIndex then
+        local oldHoverIndex = view.hover.currentHandIndex
+        local oldHoverInstanceId = view.hover.currentInstanceId
+        if oldHoverIndex then
+          local from = UI.getCardInHandRect(view, oldHoverIndex)
+          local to = view.anchors.handSlots.slots[oldHoverIndex]
+          view.hover.animating[oldHoverIndex] = Tween.new({
+            from = from,
+            to = to,
+            id = oldHoverInstanceId,
+            duration = ANIMATION_INTERVALS.CARD_HOVER_DOWN_TIME,
+            tag = TWEENS.CARD_HOVER_DOWN,
+          })
+        end
 
-      local oldHoverIndex = view.hover.currentHandIndex
-      local oldHoverInstanceId = view.hover.currentInstanceId
-      if oldHoverIndex then
-        local from = UI.getCardInHandRect(view, oldHoverIndex)
-        local to = view.anchors.handSlots.slots[oldHoverIndex]
-        view.hover.animating[oldHoverIndex] = Tween.new({
-          from = from,
-          to = to,
-          id = oldHoverInstanceId,
-          duration = ANIMATION_INTERVALS.CARD_HOVER_DOWN_TIME,
-          tag = TWEENS.CARD_HOVER_DOWN,
-        })
-      end
+        view.hover.currentHandIndex = newHoverIndex
+        view.hover.currentInstanceId = uiIntent.cardInstanceId
 
-      view.hover.currentHandIndex = newHoverIndex
-      view.hover.currentInstanceId = uiIntent.cardInstanceId
-
-      if newHoverIndex then
-        local newCardInstanceId = uiIntent.cardInstanceId
-        local from = UI.getCardInHandRect(view, newHoverIndex)
-        local to = UI.getCardHoverOffset(view.anchors.handSlots.slots[newHoverIndex])
-        view.hover.animating[newHoverIndex] = Tween.new({
-          from = from,
-          to = to,
-          id = newCardInstanceId,
-          duration = ANIMATION_INTERVALS.CARD_HOVER_UP_TIME,
-          tag = TWEENS.CARD_HOVER_UP,
-        })
+        if newHoverIndex then
+          local newCardInstanceId = uiIntent.cardInstanceId
+          local from = UI.getCardInHandRect(view, newHoverIndex)
+          local to = UI.getCardHoverOffset(view.anchors.handSlots.slots[newHoverIndex])
+          view.hover.animating[newHoverIndex] = Tween.new({
+            from = from,
+            to = to,
+            id = newCardInstanceId,
+            duration = ANIMATION_INTERVALS.CARD_HOVER_UP_TIME,
+            tag = TWEENS.CARD_HOVER_UP,
+          })
+        end
+      else
+        -- Keep instanceId in sync when index is unchanged.
+        view.hover.currentInstanceId = uiIntent.cardInstanceId
       end
     elseif uiIntent.kind == INTENTS.ANIMATE_DRAW_DECK_TO_HAND then
       view.inputLocked = true
@@ -113,7 +116,7 @@ function UI.update(view, dt)
         id = uiIntent.newCardInstanceId,
         tag = TWEENS.CARD_DRAW,
       })
-      tween.onComplete = function ()
+      tween.onComplete = function()
         table.insert(
           view.signals,
           { type = ACTIONS.FINISH_CARD_DRAW, cardInstanceId = uiIntent.newCardInstanceId, taskId = uiIntent.taskId }
@@ -147,27 +150,71 @@ function UI.update(view, dt)
       end
     elseif uiIntent.kind == INTENTS.ANIMATE_HAND_REFLOW then
       view.inputLocked = true
-      local handIds = uiIntent.existingInstanceIds
-      local excludingIndex = uiIntent.excludingIndex or nil
-      local newSlotCount = uiIntent.finalSlotCount
+      view.handAnimations = {}
+      
+      local newSlotCount = uiIntent.newSlotCount
+      local oldSlotCount = uiIntent.oldSlotCount
+      local holeIndex = uiIntent.holeIndex
+      local reflowMap = uiIntent.reflowMap
+
+      -- Capture old layout to use as stable "from" positions
+      local oldSlots = view.anchors.handSlots.slots
+
       local newSlotsAndMode = view.anchors.getHandSlots(newSlotCount)
       local newSlots = newSlotsAndMode.slots
 
-      for i = 1, newSlotCount do
-        if i ~= excludingIndex then
-          local from = UI.getCardInHandRect(view, i)
-          local to = newSlots[i]
+      local oldSlotIndex = 1
+      local newSlotIndex = 1
+
+      local isDraw = newSlotCount > oldSlotCount
+      local isDiscard = newSlotCount < oldSlotCount
+
+      -- Only skip the hole on the side that actually has one.
+      while oldSlotIndex <= oldSlotCount and newSlotIndex <= newSlotCount do
+        if isDraw and newSlotIndex == holeIndex then
+          -- Hole exists in the NEW layout (draw): skip this new index
+          newSlotIndex = newSlotIndex + 1
+        elseif isDiscard and oldSlotIndex == holeIndex then
+          -- Hole exists in the OLD layout (discard): skip this old index
+          oldSlotIndex = oldSlotIndex + 1
+        else
+          -- Move card from old slot -> new slot
+          local from = oldSlots[oldSlotIndex]
+          local to = newSlots[newSlotIndex]
+
           if from and to then
-            view.handAnimations[i] = Tween.new({
+            local cardId = reflowMap and reflowMap[newSlotIndex] or nil
+            view.handAnimations[newSlotIndex] = Tween.new({
               from = from,
               to = to,
-              id = handIds[i],
+              id = cardId,
               duration = ANIMATION_INTERVALS.HAND_REFLOW_TIME,
               tag = TWEENS.CARD_REFLOW,
             })
           end
+
+          oldSlotIndex = oldSlotIndex + 1
+          newSlotIndex = newSlotIndex + 1
         end
       end
+
+      -- Keep hover pointing at the same card instance after reflow
+      if view.hover.currentInstanceId and reflowMap then
+        local newHoverIndex = nil
+        for idx, id in ipairs(reflowMap) do
+          if id == view.hover.currentInstanceId then
+            newHoverIndex = idx
+            break
+          end
+        end
+        view.hover.currentHandIndex = newHoverIndex
+        for idx, tween in pairs(view.hover.animating) do
+          if tween.id == view.hover.currentInstanceId and idx ~= newHoverIndex then
+            view.hover.animating[idx] = nil
+          end
+        end
+      end
+
       view.anchors.handSlots = newSlotsAndMode
     end
   end
@@ -184,7 +231,8 @@ function UI.update(view, dt)
   end
 
   -- Unlock when all animations are done
-  if view.inputLocked and #view.active == 0 and #view.handAnimations == 0 then
+  local handAnimEmpty = next(view.handAnimations) == nil
+  if view.inputLocked and #view.active == 0 and handAnimEmpty then
     view.inputLocked = false
   end
 end

@@ -11,7 +11,11 @@ function AnimatingCardsUI.draw(view, animatingCards)
   if not animatingCards or not animatingCards.order or #animatingCards.order == 0 then return end
 
   for id, card in AnimatingCards.iter(animatingCards) do
-    local r, angle = Tween.rectForCard(view, id)
+    local r, angle, isFallback = Tween.rectForCard(view, id)
+
+    if isFallback then
+      print("[AnimatingCardsUI.draw] Fallback rect for: ", card.name)
+    end
 
     if r and card then
       love.graphics.push()

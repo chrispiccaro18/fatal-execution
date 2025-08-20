@@ -105,9 +105,9 @@ function love.mousepressed(x, y, button)
   end
 end
 
-function love.mousemoved(x, y, dx, dy)
+function love.mousemoved(x, y)
   if CurrentScreen == CURRENT_SCREEN.GAME then
-    GameLoop.mousemoved(x, y, dx, dy)
+    GameLoop.mousemoved(x, y)
   end
 end
 

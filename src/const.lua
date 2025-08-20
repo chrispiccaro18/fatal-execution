@@ -44,11 +44,11 @@ Const.TASKS                = {
 Const.UI                      = {
   ANIM = {
     -- CARD_DRAW_INTERVAL = 1, -- spacing between successive draws
-    HAND_REFLOW_TIME = 2,
-    CARD_DISCARD_TIME = 2,    -- time to discard a single card, SHOULD BE LESS THAN REFLOW TIME?
-    CARD_DRAW_TIME = 2,      -- time to draw a single card
-    CARD_HOVER_UP_TIME = 2,
-    CARD_HOVER_DOWN_TIME = 2,
+    HAND_REFLOW_TIME = 1,
+    CARD_DISCARD_TIME = 1,    -- time to discard a single card, SHOULD BE LESS THAN REFLOW TIME?
+    CARD_DRAW_TIME = 1,      -- time to draw a single card
+    CARD_HOVER_UP_TIME = 1,
+    CARD_HOVER_DOWN_TIME = 1,
   },
   INTENTS = {
     ANIMATE_DRAW_DECK_TO_HAND = "animate_draw_deck_to_hand",

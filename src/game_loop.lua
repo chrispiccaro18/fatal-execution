@@ -1,17 +1,19 @@
-local Const     = require("const")
-local Store     = require("store")
-local Profiles  = require("profiles")
-local cfg       = require("ui.cfg")
-local Display   = require("ui.display")
-local Click     = require("ui.click")
-local Menu      = require("ui.menus.menu")
+local Const               = require("const")
+local Store               = require("store")
+local Profiles            = require("profiles")
+local cfg                 = require("ui.cfg")
+local Display             = require("ui.display")
+local Click               = require("ui.click")
+local Menu                = require("ui.menus.menu")
 
-local TURN_PHASES = Const.TURN_PHASES
-local ACTIONS = Const.DISPATCH_ACTIONS
+local TURN_PHASES         = Const.TURN_PHASES
+local ACTIONS             = Const.DISPATCH_ACTIONS
 
-local GameLoop  = {}
-GameLoop.profileIndex = nil
+local GameLoop            = {}
+GameLoop.profileIndex     = nil
 GameLoop.lastHoveredIndex = nil -- Debounce hover events
+GameLoop.lastInputLocked  = false
+GameLoop.pendingHoverRescanFrames = 0
 
 function GameLoop.init(profileIndex, loadedModel)
   GameLoop.profileIndex = profileIndex
@@ -25,7 +27,40 @@ end
 
 function GameLoop.update(dt)
   Store.update(dt)
-  if Store.view and not Store.view.inputLocked then
+
+  local nowLocked = Store.view and Store.view.inputLocked or false
+
+  -- When UI unlocks (animations finished), schedule a hover rescan next frame.
+  if GameLoop.lastInputLocked and not nowLocked then
+    GameLoop.pendingHoverRescanFrames = 2
+  end
+  GameLoop.lastInputLocked = nowLocked
+
+  -- Deferred hover rescan (runs after Store.update on a following frame)
+  if GameLoop.pendingHoverRescanFrames > 0 and not nowLocked then
+    GameLoop.pendingHoverRescanFrames = GameLoop.pendingHoverRescanFrames - 1
+    if GameLoop.pendingHoverRescanFrames == 0 then
+      local mx, my = love.mouse.getPosition()
+      local vx, vy = Display.toVirtual(mx, my)
+      local hit = Click.hit(vx, vy)
+
+      local newHoveredIndex, cardInstanceId = nil, nil
+      if hit and hit.id == Const.HIT_IDS.CARD then
+        newHoveredIndex = hit.payload.handIndex
+        cardInstanceId = hit.payload.instanceId
+      end
+
+      -- Force a recompute regardless of previous debounce
+      GameLoop.lastHoveredIndex = newHoveredIndex
+      Store.scheduleIntent({
+        kind = Const.UI.INTENTS.SET_HOVERED_CARD,
+        handIndex = newHoveredIndex,
+        cardInstanceId = cardInstanceId,
+      })
+    end
+  end
+
+  if Store.view and not nowLocked then
     if (not Store.model.tasks) or (#Store.model.tasks == 0) then
       Profiles.setCurrentRun(GameLoop.profileIndex, Store.model)
     end

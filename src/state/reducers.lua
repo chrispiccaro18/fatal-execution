@@ -135,11 +135,16 @@ function Reducers.reduce(model, action)
         taskId = dealTask.id,
       }
 
+      local reflowMap = {}
+      for i = 1, #model.hand do
+        reflowMap[i] = model.hand[i].instanceId
+      end
       uiIntents[#uiIntents + 1] = {
         kind = UI_INTENTS.ANIMATE_HAND_REFLOW,
-        existingInstanceIds = Hand.getCurrentInstanceIds(newModel.hand),
-        finalSlotCount = newSlotCount,
-        excludingIndex = newSlotCount,
+        newSlotCount = newSlotCount,
+        oldSlotCount = #newModel.hand,
+        holeIndex = newSlotCount,
+        reflowMap = reflowMap,
       }
     else
       Log.add(newModel, "Deck empty: couldn't draw a card.", {
@@ -205,10 +210,20 @@ function Reducers.reduce(model, action)
       discardedCardInstanceId = card.instanceId,
       discardedCardHandIndex = handIndex,
     }
+    local reflowMap = {}
+    local newHandIndex = 1
+    for i =1, #model.hand do
+      if i ~= handIndex then
+        reflowMap[newHandIndex] = model.hand[i].instanceId
+        newHandIndex = newHandIndex + 1
+      end
+    end
     uiIntents[#uiIntents + 1] = {
       kind = UI_INTENTS.ANIMATE_HAND_REFLOW,
-      existingInstanceIds = Hand.getCurrentInstanceIds(newModel.hand),
-      finalSlotCount = #newHand,
+      newSlotCount = #newHand,
+      oldSlotCount = #model.hand,
+      holeIndex = handIndex,
+      reflowMap = reflowMap,
     }
   end
 
