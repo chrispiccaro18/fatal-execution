@@ -44,9 +44,9 @@ Const.TASKS                = {
 Const.UI                      = {
   ANIM = {
     -- CARD_DRAW_INTERVAL = 1, -- spacing between successive draws
-    HAND_REFLOW_TIME = 2,
-    CARD_DISCARD_TIME = 2,    -- time to discard a single card, SHOULD BE LESS THAN REFLOW TIME?
-    CARD_DRAW_TIME = 2,      -- time to draw a single card
+    HAND_REFLOW_TIME = .75,
+    CARD_DISCARD_TIME = .75,    -- time to discard a single card, SHOULD BE LESS THAN REFLOW TIME?
+    CARD_DRAW_TIME = .75,      -- time to draw a single card
     CARD_HOVER_UP_TIME = 0.1,
     CARD_HOVER_DOWN_TIME = 0.5,
   },
