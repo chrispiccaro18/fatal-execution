@@ -89,7 +89,7 @@ function LayoutHand.computeSlots(panel, n)
   local baseY   = areaY + C.fan.liftPx
 
   for i = 1, n do
-    local t = (i - center) / (center - 1)    -- ~[-1,1]
+    local t = (i - center) / (center - 1) -- ~[-1,1]
     if n == 2 then t = (i == 1) and -1 or 1 end
     local ang  = (leftA + (rightA - leftA) * ((i - 1) / (n - 1)))
     local aRad = rad(ang)
@@ -104,30 +104,41 @@ end
 -- Returns per-slot x-offsets (pixels) to apply when a slot is hovered.
 -- handSlots = { mode=..., slots={ {x,y,w,h,angle,z}, ... } }
 -- hoveredIndex = index of hovered card (1..n) or nil
-function LayoutHand.computeHoverOffsets(handSlots, hoveredIndex)
+function LayoutHand.computeHoverOffsets(handSlots, hoveredIndex, panel)
   local mode  = handSlots.mode
   local slots = handSlots.slots
   local n     = #slots
   if not hoveredIndex or n <= 1 then return {} end
-  if mode == MODE.SPACED then return {} end  -- no need to spread when fully spaced
+  if mode == MODE.SPACED then return {} end -- no need to spread when fully spaced
 
-  local C         = cfg.handPanel
-  local cardW     = C.cardW
-  local maxSpacing= C.maxSpacingX
+  local C          = cfg.handPanel
+  local cardW      = C.cardW
+  local maxSpacing = C.maxSpacingX
 
-  -- local step around hovered index (x delta between neighbors)
+  -- compute available area width (same logic as computeSlots)
+  local pad        = C.pad or 0
+  local areaW      = (panel and panel.w or 0) - pad * 2
+  if areaW <= 0 then areaW = slots[#slots].x - slots[1].x + cardW end
+
+  -- uniform baseline step for non-hovered cards (make overlaps equal)
+  local minVis = clamp(C.minVisiblePx, 8, cardW)
+  local uniformStep = (n > 1) and ((areaW - cardW) / (n - 1)) or cardW
+  if uniformStep < minVis then uniformStep = minVis end
+
+  -- local step around hovered index (fallback to uniformStep)
   local function stepAt(i)
     if i < 1 or i >= n then
-      return (n >= 2) and (slots[2].x - slots[1].x) or cardW
+      return uniformStep
     end
-    return slots[i + 1].x - slots[i].x
+    -- prefer uniform baseline instead of raw slot spacing to keep non-hovered equal
+    return uniformStep
   end
 
   local baseLeft  = stepAt(hoveredIndex - 1)
   local baseRight = stepAt(hoveredIndex)
-  local targetGap = cardW + maxSpacing                  -- make neighbors adjacent to hovered
-  local deltaL    = math_max(0, targetGap - baseLeft)   -- extra gap needed on the left side
-  local deltaR    = math_max(0, targetGap - baseRight)  -- extra gap needed on the right side
+  local targetGap = cardW + maxSpacing                 -- make neighbors adjacent to hovered
+  local deltaL    = math_max(0, targetGap - baseLeft)  -- extra gap needed on the left side
+  local deltaR    = math_max(0, targetGap - baseRight) -- extra gap needed on the right side
   local delta     = math_max(deltaL, deltaR)
   if delta <= 0 then return {} end
 
@@ -135,25 +146,68 @@ function LayoutHand.computeHoverOffsets(handSlots, hoveredIndex)
   local baseDecay = (mode == MODE.FAN) and 0.55 or 0.60
   local decay     = clamp(baseDecay - 0.02 * (n - 5), 0.25, 0.70)
 
-  local offsets = {}
-  for i = 1, n do offsets[i] = 0 end
+  -- helper to build offsets for a given delta
+  local function buildOffsets(curDelta)
+    local offsets = {}
+    for i = 1, n do offsets[i] = 0 end
 
-  -- Push right side outwards
-  for i = hoveredIndex + 1, n do
-    local dist = i - hoveredIndex
-    offsets[i] = offsets[i] + (delta * (decay ^ (dist - 1)))
-  end
-  -- Push left side outwards
-  for i = hoveredIndex - 1, 1, -1 do
-    local dist = hoveredIndex - i
-    offsets[i] = offsets[i] - (delta * (decay ^ (dist - 1)))
+    -- Push right side outwards
+    for i = hoveredIndex + 1, n do
+      local dist = i - hoveredIndex
+      offsets[i] = offsets[i] + (curDelta * (decay ^ (dist - 1)))
+    end
+    -- Push left side outwards
+    for i = hoveredIndex - 1, 1, -1 do
+      local dist = hoveredIndex - i
+      offsets[i] = offsets[i] - (curDelta * (decay ^ (dist - 1)))
+    end
+
+    -- Keep the overall center stable
+    local sum = 0
+    for i = 1, n do sum = sum + offsets[i] end
+    local centerShift = sum / n
+    for i = 1, n do offsets[i] = offsets[i] - centerShift end
+
+    return offsets
   end
 
-  -- Keep the overall center stable
-  local sum = 0
-  for i = 1, n do sum = sum + offsets[i] end
-  local centerShift = sum / n
-  for i = 1, n do offsets[i] = offsets[i] - centerShift end
+  -- try the computed delta; if it would make any adjacent visible strip < 10% cardW,
+  -- progressively reduce delta (this effectively underlaps the hovered card).
+  local minAllowedVisible = 0.10 * cardW
+  local tryDelta = delta
+  local offsets = buildOffsets(tryDelta)
+  local function minVisibleBetween(offsets)
+    local minV = math.huge
+    for i = 1, n - 1 do
+      local leftPos  = slots[i].x + offsets[i]
+      local rightPos = slots[i + 1].x + offsets[i + 1]
+      local visible  = rightPos - leftPos
+      if visible < minV then minV = visible end
+    end
+    return minV
+  end
+
+  local minV = minVisibleBetween(offsets)
+  local iter = 0
+  while minV < minAllowedVisible and tryDelta > 1 and iter < 6 do
+    tryDelta = tryDelta * 0.5
+    offsets = buildOffsets(tryDelta)
+    minV = minVisibleBetween(offsets)
+    iter = iter + 1
+  end
+
+  -- If after reduction still too small, just return offsets that minimize disruption (already computed)
+  -- Clamp offsets so cards don't escape the panel bounds (panel optional).
+  if panel and panel.w and slots and #slots > 0 then
+    for i = 1, n do
+      local slot = slots[i]
+      if slot then
+        local minOffset = (panel.x or 0) - slot.x
+        local maxOffset = (panel.x or 0) + (panel.w or 0) - slot.x - slot.w
+        offsets[i] = clamp(offsets[i], minOffset, maxOffset)
+      end
+    end
+  end
 
   return offsets
 end

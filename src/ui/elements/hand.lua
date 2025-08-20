@@ -7,7 +7,9 @@ local Card  = require("ui.elements.card")
 local HandUI = {}
 
 local function drawCard(view, card, handIndex)
-  local r = UI.getCardInHandRect(view, handIndex)
+  local r = UI.getRectForInstance(view, card and card.instanceId) or UI.getCardInHandRect(view, handIndex)
+  if not r then return end
+
   local angle = r.angle or 0
 
   love.graphics.push()

@@ -9,22 +9,101 @@ local TWEENS              = Const.UI.TWEENS
 local ACTIONS             = Const.DISPATCH_ACTIONS
 
 local UI                  = {}
+local DEBUG_UI            = false
+function UI.setDebug(v) DEBUG_UI = not not v end
+
 function UI.init()
   return {
-    inputLocked    = false,
-    intents        = {},
-    active         = {}, -- For non-hand animations (draw, discard)
-    anchors        = nil,
-    hover          = {
+    inputLocked          = false,
+    intents              = {},
+    active               = {}, -- For non-hand animations (draw, discard)
+    anchors              = nil,
+    hover                = {
       currentHandIndex = nil,
       currentInstanceId = nil,
       animating = {},
       spreadPx = Const.CARD_WIDTH / 4,
     },
-    handAnimations = {}, -- For hand-internal animations (reflow)
-    signals        = {},
-    lockedTasks    = {},
+    tweensById           = {}, -- map cardInstanceId -> tween (for robust lookup)
+    handAnimations       = {}, -- For hand-internal animations (reflow)
+    signals              = {},
+    lockedTasks          = {},
+    _debug_discard_count = 0,
+    _last_hand_rects     = nil,
   }
+end
+
+local function debugShouldLog(view, tag)
+  if not DEBUG_UI then return false end
+  if tag == TWEENS.CARD_DISCARD then return true end
+  if view and view._debug_discard_count and view._debug_discard_count > 0 then return true end
+  return false
+end
+
+-- helper registry so tweens can be found/cleared by cardInstanceId
+local function registerTween(view, tween)
+  if not view or not tween then return end
+  if tween.id then view.tweensById[tween.id] = tween end
+  if debugShouldLog(view, tween and tween.tag) and General and tween then
+    print("DEBUG: registerTween", tween.tag or "?", tween.id or "?")
+    if tween.from then print("  from:", General.dump(tween.from)) end
+    if tween.to then print("  to:  ", General.dump(tween.to)) end
+  end
+end
+local function unregisterTween(view, tween)
+  if not view or not tween then return end
+  if tween.id then view.tweensById[tween.id] = nil end
+  if debugShouldLog(view, tween and tween.tag) and tween then
+    print("DEBUG: unregisterTween", tween.tag or "?", tween.id or "?")
+  end
+end
+
+-- Helpers to derive instance id from a hand slot (anchors may carry different field names)
+local local_getSlotInstanceId = function(slot)
+  if not slot then return nil end
+  return slot.cardInstanceId or slot.instanceId or slot.id or nil
+end
+
+-- Find slot index for a given instance id (scans current handSlots)
+local function findSlotIndexForInstance(view, instanceId)
+  if not view or not view.anchors or not view.anchors.handSlots or not instanceId then return nil end
+  for i, slot in ipairs(view.anchors.handSlots.slots) do
+    if local_getSlotInstanceId(slot) == instanceId then return i end
+  end
+  return nil
+end
+
+function UI.getCardInstanceIdAt(view, handIndex)
+  if not view or not view.anchors or not view.anchors.handSlots then return nil end
+  local slot = view.anchors.handSlots.slots[handIndex]
+  return local_getSlotInstanceId(slot)
+end
+
+-- Utility: lookup a tween by card instance id
+local function getTweenById(view, id)
+  if not view or not id then return nil end
+  return view.tweensById[id]
+end
+
+-- Helper exposed: get a sampled rect for an instance id if a tween exists,
+-- otherwise try hover/static fallbacks.
+function UI.getTweenById(view, id)
+  return getTweenById(view, id)
+end
+
+function UI.getRectForInstance(view, instanceId)
+  if not view or not instanceId then return nil end
+  local t = getTweenById(view, instanceId)
+  if t then return t:sample() end
+  -- if currently hovered, return hover offset
+  if view.hover.currentInstanceId == instanceId and view.hover.currentHandIndex and view.anchors and view.anchors.handSlots then
+    local slot = view.anchors.handSlots.slots[view.hover.currentHandIndex]
+    if slot then return UI.getCardHoverOffset(slot) end
+  end
+  -- try to find the index of this instance in the hand and fall back to index-based rect
+  local idx = findSlotIndexForInstance(view, instanceId)
+  if idx then return UI.getCardInHandRect(view, idx) end
+  return nil
 end
 
 function UI.getCardHoverOffset(slot)
@@ -53,12 +132,12 @@ function UI.getSpreadRect(view, handIndex, offsets)
     r.x = r.x + (offsets[handIndex] or 0)
   end
 
-  local playPanel = view.anchors and view.anchors.sections and view.anchors.sections.play
-  if playPanel and r then
-    local minX = playPanel.x
-    local maxX = playPanel.x + playPanel.w - r.w
-    r.x = General.clamp(r.x, minX, maxX)
-  end
+  -- local playPanel = view.anchors and view.anchors.sections and view.anchors.sections.play
+  -- if playPanel and r then
+  --   local minX = playPanel.x
+  --   local maxX = playPanel.x + playPanel.w - r.w
+  --   r.x = General.clamp(r.x, minX, maxX)
+  -- end
   return r
 end
 
@@ -66,32 +145,50 @@ end
 function UI.getCardInHandRect(view, handIndex)
   -- Guard: require anchors/slots
   if not view or not view.anchors or not view.anchors.handSlots or not view.anchors.handSlots.slots then
+    if debugShouldLog(view) then print("DEBUG: getCardInHandRect - missing anchors/slots") end
     return nil
   end
 
   -- Priority 1: Is there a hand-specific animation (reflow) running?
   if view.handAnimations[handIndex] then
-    return view.handAnimations[handIndex]:sample()
+    local r = view.handAnimations[handIndex]:sample()
+    if debugShouldLog(view) then print("DEBUG: getCardInHandRect - handAnimation", handIndex, General.dump(r)) end
+    return r
     -- Priority 2: Is there an active HOVER tween for this card?
   elseif view.hover.animating[handIndex] then
-    return view.hover.animating[handIndex]:sample()
+    local r = view.hover.animating[handIndex]:sample()
+    if debugShouldLog(view) then print("DEBUG: getCardInHandRect - hover.animating", handIndex, General.dump(r)) end
+    return r
     -- Priority 3: Is this card the CURRENTLY hovered card (static and raised)?
-  elseif view.hover.currentHandIndex and not view.inputLocked then
+  elseif view.hover.currentHandIndex then
     local hovered = view.hover.currentHandIndex
     if handIndex == hovered then
       local slot = view.anchors.handSlots.slots[handIndex]
-      if not slot then return nil end
-      return UI.getCardHoverOffset(slot)
+      if not slot then
+        if debugShouldLog(view) then print("DEBUG: getCardInHandRect - hovered but no slot", handIndex) end
+        return nil
+      end
+      local r = UI.getCardHoverOffset(slot)
+      if debugShouldLog(view) then print("DEBUG: getCardInHandRect - hovered static", handIndex, General.dump(r)) end
+      return r
     else
       if not view.anchors.getHoverOffsets then
-        return view.anchors.handSlots.slots[handIndex]
+        local r = view.anchors.handSlots.slots[handIndex]
+        if debugShouldLog(view) then print("DEBUG: getCardInHandRect - hovered spread fallback anchor", handIndex,
+            General.dump(r)) end
+        return r
       end
-      local offsets = view.anchors.getHoverOffsets(view.anchors.handSlots, hovered)
-      return UI.getSpreadRect(view, handIndex, offsets)
+      local playPanel = view.anchors and view.anchors.sections and view.anchors.sections.play
+      local offsets = view.anchors.getHoverOffsets(view.anchors.handSlots, hovered, playPanel)
+      local r = UI.getSpreadRect(view, handIndex, offsets)
+      if debugShouldLog(view) then print("DEBUG: getCardInHandRect - hovered spread", handIndex, General.dump(r)) end
+      return r
     end
     -- Priority 4: Default to its static slot in the hand.
   else
-    return view.anchors.handSlots.slots[handIndex]
+    local r = view.anchors.handSlots.slots[handIndex]
+    if debugShouldLog(view) then print("DEBUG: getCardInHandRect - anchor", handIndex, General.dump(r)) end
+    return r
   end
 end
 
@@ -119,13 +216,16 @@ function UI.update(view, dt)
 
         if oldHoverIndex then
           local to = slots[oldHoverIndex]
-          view.hover.animating[oldHoverIndex] = Tween.new({
-            from = fromByIndex[oldHoverIndex],
-            to = to,
+          if view.hover.animating[oldHoverIndex] then unregisterTween(view, view.hover.animating[oldHoverIndex]) end
+          local t = Tween.new({
+            from = deepcopy(fromByIndex[oldHoverIndex]),
+            to = deepcopy(to),
             id = oldHoverInstanceId,
             duration = ANIMATION_INTERVALS.CARD_HOVER_DOWN_TIME,
             tag = TWEENS.CARD_HOVER_DOWN,
           })
+          view.hover.animating[oldHoverIndex] = t
+          registerTween(view, t)
         end
 
         view.hover.currentHandIndex = newHoverIndex
@@ -134,7 +234,8 @@ function UI.update(view, dt)
         if not view.inputLocked then
           local offsets = {}
           if newHoverIndex then
-            offsets = view.anchors.getHoverOffsets(view.anchors.handSlots, newHoverIndex)
+            local playPanel = view.anchors and view.anchors.sections and view.anchors.sections.play
+            offsets = view.anchors.getHoverOffsets(view.anchors.handSlots, newHoverIndex, playPanel)
           end
 
           for i = 1, slotCount do
@@ -147,13 +248,18 @@ function UI.update(view, dt)
               end
               local from = fromByIndex[i]
               if from and to then
-                view.hover.animating[i] = Tween.new({
-                  from = from,
-                  to = to,
-                  -- id = uiIntent.cardInstanceId,
+                -- clear any existing tween at this index first
+                if view.hover.animating[i] then unregisterTween(view, view.hover.animating[i]) end
+                local cardId = UI.getCardInstanceIdAt(view, i)
+                local t = Tween.new({
+                  from = deepcopy(from),
+                  to = deepcopy(to),
+                  id = cardId,
                   duration = ANIMATION_INTERVALS.HAND_REFLOW_TIME,
                   tag = TWEENS.CARD_REFLOW,
                 })
+                view.hover.animating[i] = t
+                registerTween(view, t)
               else
                 view.hover.animating[i] = nil
                 print("Warning: from or to is nil for hand index " .. i)
@@ -166,13 +272,16 @@ function UI.update(view, dt)
           local newCardInstanceId = uiIntent.cardInstanceId
           local from = fromByIndex[newHoverIndex]
           local to = UI.getCardHoverOffset(slots[newHoverIndex])
-          view.hover.animating[newHoverIndex] = Tween.new({
-            from = from,
-            to = to,
+          if view.hover.animating[newHoverIndex] then unregisterTween(view, view.hover.animating[newHoverIndex]) end
+          local t = Tween.new({
+            from = deepcopy(from),
+            to = deepcopy(to),
             id = newCardInstanceId,
             duration = ANIMATION_INTERVALS.CARD_HOVER_UP_TIME,
             tag = TWEENS.CARD_HOVER_UP,
           })
+          view.hover.animating[newHoverIndex] = t
+          registerTween(view, t)
         end
       else
         -- Keep instanceId in sync when index is unchanged.
@@ -183,12 +292,13 @@ function UI.update(view, dt)
       local from = view.anchors.getDeckRect()
       local to = view.anchors.getHandSlots(uiIntent.newSlotCount).slots[uiIntent.newSlotCount]
       local tween = Tween.new({
-        from = from,
-        to = to,
+        from = deepcopy(from),
+        to = deepcopy(to),
         duration = ANIMATION_INTERVALS.CARD_DRAW_TIME,
         id = uiIntent.newCardInstanceId,
         tag = TWEENS.CARD_DRAW,
       })
+      registerTween(view, tween)
       tween.onComplete = function()
         table.insert(
           view.signals,
@@ -198,16 +308,22 @@ function UI.update(view, dt)
       table.insert(view.active, tween)
     elseif uiIntent.kind == INTENTS.ANIMATE_DISCARD_HAND_TO_DESTRUCTOR then
       view.inputLocked = true
+      -- mark debug counting so prints happen during this discard operation
+      view._debug_discard_count = (view._debug_discard_count or 0) + 1
+
       local from = UI.getCardInHandRect(view, uiIntent.discardedCardHandIndex)
       local to = view.anchors.getDestructorRect()
       local tween = Tween.new({
-        from = from,
-        to = to,
+        from = deepcopy(from),
+        to = deepcopy(to),
         duration = ANIMATION_INTERVALS.CARD_DISCARD_TIME,
         id = uiIntent.discardedCardInstanceId,
         tag = TWEENS.CARD_DISCARD,
       })
+      registerTween(view, tween)
       tween.onComplete = function()
+        -- decrement debug counter and emit finish signal
+        view._debug_discard_count = math.max(0, (view._debug_discard_count or 1) - 1)
         table.insert(
           view.signals,
           { type = ACTIONS.FINISH_CARD_DISCARD, discardedCardInstanceId = uiIntent.discardedCardInstanceId }
@@ -215,28 +331,53 @@ function UI.update(view, dt)
       end
       table.insert(view.active, tween)
 
+      -- Snapshot current visible hand rects BEFORE clearing hover/spread state.
+      -- This snapshot is consumed by the upcoming ANIMATE_HAND_REFLOW so reflow
+      -- animates from the actual on-screen positions.
+      if view.anchors and view.anchors.handSlots and view.anchors.handSlots.slots then
+        local slotCount = #view.anchors.handSlots.slots
+        view._last_hand_rects = {}
+        for i = 1, slotCount do
+          local r = UI.getCardInHandRect(view, i)
+          view._last_hand_rects[i] = r and deepcopy(r) or nil
+        end
+      end
+
       if view.hover.currentHandIndex == uiIntent.discardedCardHandIndex then
         -- If the hovered card is being discarded, reset hover.
         view.hover.currentHandIndex = nil
         view.hover.currentInstanceId = nil
+        if view.hover.animating[uiIntent.discardedCardHandIndex] then
+          unregisterTween(view, view.hover.animating[uiIntent.discardedCardHandIndex])
+        end
         view.hover.animating[uiIntent.discardedCardHandIndex] = nil
       end
     elseif uiIntent.kind == INTENTS.ANIMATE_HAND_REFLOW then
       view.inputLocked = true
-      view.handAnimations = {}
 
       local newSlotCount = uiIntent.newSlotCount
       local oldSlotCount = uiIntent.oldSlotCount
       local holeIndex = uiIntent.holeIndex
       local reflowMap = uiIntent.reflowMap
 
-      -- Capture old layout to use as stable "from" positions
-      local oldSlots = view.anchors.handSlots.slots
+      -- Capture current on-screen rects BEFORE clearing handAnimations so we sample
+      -- any active hand tweens / hover tweens as the "from" positions.
       local fromByIndex = {}
-      for i = 1, oldSlotCount do
-        if oldSlots[i] then fromByIndex[i] = deepcopy(oldSlots[i]) else fromByIndex[i] = nil end
+      if view._last_hand_rects then
+        for i = 1, oldSlotCount do
+          fromByIndex[i] = view._last_hand_rects[i] and deepcopy(view._last_hand_rects[i]) or nil
+        end
+        -- consume snapshot so future unrelated reflows don't reuse it
+        view._last_hand_rects = nil
+      else
+        for i = 1, oldSlotCount do
+          local cur = UI.getCardInHandRect(view, i)
+          fromByIndex[i] = cur and deepcopy(cur) or nil
+        end
       end
 
+      -- unregister and clear any existing hand animations (now safe to clear)
+      for _, t in pairs(view.handAnimations) do unregisterTween(view, t) end
       view.handAnimations = {}
 
       local newSlotsAndMode = view.anchors.getHandSlots(newSlotCount)
@@ -263,13 +404,16 @@ function UI.update(view, dt)
 
           if from and to then
             local cardId = reflowMap and reflowMap[newSlotIndex] or nil
-            view.handAnimations[newSlotIndex] = Tween.new({
-              from = from,
-              to = to,
+            if view.handAnimations[newSlotIndex] then unregisterTween(view, view.handAnimations[newSlotIndex]) end
+            local t = Tween.new({
+              from = deepcopy(from),
+              to = deepcopy(to),
               id = cardId,
               duration = ANIMATION_INTERVALS.HAND_REFLOW_TIME,
               tag = TWEENS.CARD_REFLOW,
             })
+            view.handAnimations[newSlotIndex] = t
+            registerTween(view, t)
           end
 
           oldSlotIndex = oldSlotIndex + 1
@@ -289,6 +433,7 @@ function UI.update(view, dt)
         view.hover.currentHandIndex = newHoverIndex
         for idx, tween in pairs(view.hover.animating) do
           if tween.id == view.hover.currentInstanceId and idx ~= newHoverIndex then
+            unregisterTween(view, tween)
             view.hover.animating[idx] = nil
           end
         end
@@ -305,13 +450,22 @@ function UI.update(view, dt)
 
   -- Tick all animation groups
   for index, tween in pairs(view.hover.animating) do
-    if tween:update(dt) then view.hover.animating[index] = nil end
+    if tween:update(dt) then
+      unregisterTween(view, tween)
+      view.hover.animating[index] = nil
+    end
   end
   for index, tween in pairs(view.handAnimations) do
-    if tween:update(dt) then view.handAnimations[index] = nil end
+    if tween:update(dt) then
+      unregisterTween(view, tween)
+      view.handAnimations[index] = nil
+    end
   end
   for i = #view.active, 1, -1 do
-    if view.active[i]:update(dt) then table.remove(view.active, i) end
+    if view.active[i]:update(dt) then
+      unregisterTween(view, view.active[i])
+      table.remove(view.active, i)
+    end
   end
 
   -- Unlock when all animations are done AND no task-based locks remain

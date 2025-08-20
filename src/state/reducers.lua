@@ -193,7 +193,20 @@ function Reducers.reduce(model, action)
     local card = newModel.hand[handIndex]
     if not card then error("No card at index " .. tostring(handIndex)) end
 
+    local startingRam = model.ram
     newModel.ram = newModel.ram + card.cost
+
+    if card.onDiscard then
+      local discardActionType = card.onDiscard.type
+      local discardActionAmount = card.onDiscard.amount or 0
+
+      if discardActionType == Const.ON_DISCARD_EFFECT_TYPES.RAM_MULTIPLIER then
+        newModel.ram = newModel.ram * discardActionAmount
+      end
+    end
+
+    local ramDelta = math.abs(newModel.ram - startingRam)
+    -- TODO: emit ram pulse with ramDelta
 
     -- Card is now in transit from hand to discard.
     -- 1. Remove from hand
