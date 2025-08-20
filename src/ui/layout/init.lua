@@ -57,15 +57,15 @@ local function relayout(w, h, sections)
 
   sections.first      = nextRow(cfg.systemsH)
   sections.second     = nextRow(cfg.effectsH)
-  sections.third      = nextRow(cfg.playH)
-  sections.fourth     = nextRow(cfg.deckH)
+  sections.third     = nextRow(cfg.deckH)
+  sections.fourth      = nextRow(cfg.playH)
 
   sections.systems    = sections.first
   sections.effects    = sliceH(sections.second, "left", 0.5)
   sections.logs       = sliceH(sections.second, "right", 0.5)
-  sections.play       = sections.third
-  sections.deck       = sliceH(sections.fourth, "left", 0.33)
-  sections.ram        = sliceH(sections.fourth, "center", 0.33)
+  sections.deck       = sliceH(sections.third, "left", 0.33)
+  sections.ram        = sliceH(sections.third, "center", 0.33)
+  sections.play       = sections.fourth
 
   -- RIGHT COLUMN
   sections.right      = rect(leftW + g, 0, rightW, h)
@@ -85,10 +85,17 @@ function Layout.compute(W, H)
 
   return {
     sections = sections,
+    getHandLayout = function(n, hoveredIndex)
+      if hoveredIndex then
+        return HandLayout.getHoveredLayout(handPanel, n, hoveredIndex)
+      else
+        return HandLayout.computeSlots(handPanel, n)
+      end
+    end,
     getHandSlots = function(n) return HandLayout.computeSlots(handPanel, n) end,
     getDeckRect = function() return DeckLayout.computeRect(deckPanel) end,
     getDestructorRect = function() return DestructorLayout.computeRect(destructorPanel) end,
-    getHoverOffsets = function(handSlots, hoveredIndex, panel) 
+    getHoverOffsets = function(handSlots, hoveredIndex, panel)
       return HandLayout.computeHoverOffsets(handSlots, hoveredIndex, panel or handPanel)
     end
   }

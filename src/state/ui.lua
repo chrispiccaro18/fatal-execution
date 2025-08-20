@@ -98,7 +98,11 @@ function UI.getRectForInstance(view, instanceId)
   -- if currently hovered, return hover offset
   if view.hover.currentInstanceId == instanceId and view.hover.currentHandIndex and view.anchors and view.anchors.handSlots then
     local slot = view.anchors.handSlots.slots[view.hover.currentHandIndex]
-    if slot then return UI.getCardHoverOffset(slot) end
+    if slot then
+      local n = #view.anchors.handSlots.slots
+      local layout = view.anchors.getHandLayout(n, view.hover.currentHandIndex)
+      return layout.slots[view.hover.currentHandIndex]
+    end
   end
   -- try to find the index of this instance in the hand and fall back to index-based rect
   local idx = findSlotIndexForInstance(view, instanceId)
@@ -106,40 +110,6 @@ function UI.getRectForInstance(view, instanceId)
   return nil
 end
 
-function UI.getCardHoverOffset(slot)
-  assert(slot, "[getCardHoverOffset] Slot is required")
-  return {
-    x = slot.x - (slot.w * 0.1) / 2,
-    y = slot.y - 30,
-    -- y = slot.y - (slot.h * 0.1) / 2,
-    w = slot.w * 1.1,
-    h = slot.h * 1.1,
-  }
-  -- to.y = to.y - 30
-  -- to.w = to.w * 1.1
-  -- to.h = to.h * 1.1
-  -- to.x = to.x - (to.w - slot.w) / 2
-  -- return to
-end
-
-function UI.getSpreadRect(view, handIndex, offsets)
-  local base = view.anchors.handSlots.slots[handIndex]
-  if not base or not offsets[handIndex] then return base end
-  -- local dir = handIndex < hoveredIndex and -1 or 1
-  -- local spread = view.hover.spreadPx
-  local r = deepcopy(base)
-  if r then
-    r.x = r.x + (offsets[handIndex] or 0)
-  end
-
-  -- local playPanel = view.anchors and view.anchors.sections and view.anchors.sections.play
-  -- if playPanel and r then
-  --   local minX = playPanel.x
-  --   local maxX = playPanel.x + playPanel.w - r.w
-  --   r.x = General.clamp(r.x, minX, maxX)
-  -- end
-  return r
-end
 
 -- The single source of truth for a card's position *within the hand*.
 function UI.getCardInHandRect(view, handIndex)
@@ -151,45 +121,24 @@ function UI.getCardInHandRect(view, handIndex)
 
   -- Priority 1: Is there a hand-specific animation (reflow) running?
   if view.handAnimations[handIndex] then
-    local r = view.handAnimations[handIndex]:sample()
-    if debugShouldLog(view) then print("DEBUG: getCardInHandRect - handAnimation", handIndex, General.dump(r)) end
-    return r
-    -- Priority 2: Is there an active HOVER tween for this card?
-  elseif view.hover.animating[handIndex] then
-    local r = view.hover.animating[handIndex]:sample()
-    if debugShouldLog(view) then print("DEBUG: getCardInHandRect - hover.animating", handIndex, General.dump(r)) end
-    return r
-    -- Priority 3: Is this card the CURRENTLY hovered card (static and raised)?
-  elseif view.hover.currentHandIndex then
-    local hovered = view.hover.currentHandIndex
-    if handIndex == hovered then
-      local slot = view.anchors.handSlots.slots[handIndex]
-      if not slot then
-        if debugShouldLog(view) then print("DEBUG: getCardInHandRect - hovered but no slot", handIndex) end
-        return nil
-      end
-      local r = UI.getCardHoverOffset(slot)
-      if debugShouldLog(view) then print("DEBUG: getCardInHandRect - hovered static", handIndex, General.dump(r)) end
-      return r
-    else
-      if not view.anchors.getHoverOffsets then
-        local r = view.anchors.handSlots.slots[handIndex]
-        if debugShouldLog(view) then print("DEBUG: getCardInHandRect - hovered spread fallback anchor", handIndex,
-            General.dump(r)) end
-        return r
-      end
-      local playPanel = view.anchors and view.anchors.sections and view.anchors.sections.play
-      local offsets = view.anchors.getHoverOffsets(view.anchors.handSlots, hovered, playPanel)
-      local r = UI.getSpreadRect(view, handIndex, offsets)
-      if debugShouldLog(view) then print("DEBUG: getCardInHandRect - hovered spread", handIndex, General.dump(r)) end
-      return r
-    end
-    -- Priority 4: Default to its static slot in the hand.
-  else
-    local r = view.anchors.handSlots.slots[handIndex]
-    if debugShouldLog(view) then print("DEBUG: getCardInHandRect - anchor", handIndex, General.dump(r)) end
-    return r
+    return view.handAnimations[handIndex]:sample()
   end
+
+  -- Priority 2: Is there an active HOVER tween for this card?
+  if view.hover.animating[handIndex] then
+    return view.hover.animating[handIndex]:sample()
+  end
+
+  -- Priority 3: Default to its static slot in the hand, considering hover.
+  -- The layout module now handles all hover logic.
+  local n = #view.anchors.handSlots.slots
+  local layout = view.anchors.getHandLayout(n, view.hover.currentHandIndex)
+  if layout and layout.slots and layout.slots[handIndex] then
+    return layout.slots[handIndex]
+  end
+
+  -- Fallback to the non-hovered layout if something went wrong
+  return view.anchors.handSlots.slots[handIndex]
 end
 
 function UI.schedule(view, intents)
@@ -201,87 +150,52 @@ function UI.update(view, dt)
     local uiIntent = table.remove(view.intents, 1)
 
     if uiIntent.kind == INTENTS.SET_HOVERED_CARD then
-      -- view.inputLocked = false
       local newHoverIndex = uiIntent.handIndex
       if newHoverIndex ~= view.hover.currentHandIndex then
         local oldHoverIndex = view.hover.currentHandIndex
-        local oldHoverInstanceId = view.hover.currentInstanceId
-        local slots = view.anchors.handSlots.slots
-        local slotCount = #slots
+        local slotCount = #view.anchors.handSlots.slots
 
+        -- Get a snapshot of where all cards currently are on screen
         local fromByIndex = {}
         for i = 1, slotCount do
           fromByIndex[i] = UI.getCardInHandRect(view, i)
         end
 
-        if oldHoverIndex then
-          local to = slots[oldHoverIndex]
-          if view.hover.animating[oldHoverIndex] then unregisterTween(view, view.hover.animating[oldHoverIndex]) end
-          local t = Tween.new({
-            from = deepcopy(fromByIndex[oldHoverIndex]),
-            to = deepcopy(to),
-            id = oldHoverInstanceId,
-            duration = ANIMATION_INTERVALS.CARD_HOVER_DOWN_TIME,
-            tag = TWEENS.CARD_HOVER_DOWN,
-          })
-          view.hover.animating[oldHoverIndex] = t
-          registerTween(view, t)
-        end
+        -- Determine the target layout for all cards
+        local targetLayout = view.anchors.getHandLayout(slotCount, newHoverIndex)
+        local targetSlots = targetLayout.slots
 
+        -- Update hover state *before* creating new tweens
         view.hover.currentHandIndex = newHoverIndex
         view.hover.currentInstanceId = uiIntent.cardInstanceId
 
+        -- Create tweens for all cards to move to their new positions
         if not view.inputLocked then
-          local offsets = {}
-          if newHoverIndex then
-            local playPanel = view.anchors and view.anchors.sections and view.anchors.sections.play
-            offsets = view.anchors.getHoverOffsets(view.anchors.handSlots, newHoverIndex, playPanel)
-          end
-
           for i = 1, slotCount do
-            if i ~= newHoverIndex then
-              local to
-              if newHoverIndex then
-                to = UI.getSpreadRect(view, i, offsets)
+            local from = fromByIndex[i]
+            local to = targetSlots[i]
+            if from and to then
+              if view.hover.animating[i] then unregisterTween(view, view.hover.animating[i]) end
+              local cardId = UI.getCardInstanceIdAt(view, i)
+              local duration
+              if i == newHoverIndex then
+                duration = ANIMATION_INTERVALS.CARD_HOVER_UP_TIME
+              elseif i == oldHoverIndex then
+                duration = ANIMATION_INTERVALS.CARD_HOVER_DOWN_TIME
               else
-                to = slots[i]
+                duration = ANIMATION_INTERVALS.HAND_REFLOW_TIME
               end
-              local from = fromByIndex[i]
-              if from and to then
-                -- clear any existing tween at this index first
-                if view.hover.animating[i] then unregisterTween(view, view.hover.animating[i]) end
-                local cardId = UI.getCardInstanceIdAt(view, i)
-                local t = Tween.new({
-                  from = deepcopy(from),
-                  to = deepcopy(to),
-                  id = cardId,
-                  duration = ANIMATION_INTERVALS.HAND_REFLOW_TIME,
-                  tag = TWEENS.CARD_REFLOW,
-                })
-                view.hover.animating[i] = t
-                registerTween(view, t)
-              else
-                view.hover.animating[i] = nil
-                print("Warning: from or to is nil for hand index " .. i)
-              end
+              local t = Tween.new({
+                from = deepcopy(from),
+                to = deepcopy(to),
+                id = cardId,
+                duration = duration,
+                tag = TWEENS.CARD_REFLOW, -- A generic tag for hand movements
+              })
+              view.hover.animating[i] = t
+              registerTween(view, t)
             end
           end
-        end
-
-        if newHoverIndex then
-          local newCardInstanceId = uiIntent.cardInstanceId
-          local from = fromByIndex[newHoverIndex]
-          local to = UI.getCardHoverOffset(slots[newHoverIndex])
-          if view.hover.animating[newHoverIndex] then unregisterTween(view, view.hover.animating[newHoverIndex]) end
-          local t = Tween.new({
-            from = deepcopy(from),
-            to = deepcopy(to),
-            id = newCardInstanceId,
-            duration = ANIMATION_INTERVALS.CARD_HOVER_UP_TIME,
-            tag = TWEENS.CARD_HOVER_UP,
-          })
-          view.hover.animating[newHoverIndex] = t
-          registerTween(view, t)
         end
       else
         -- Keep instanceId in sync when index is unchanged.

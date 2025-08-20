@@ -95,11 +95,11 @@ return {
     minVisiblePx  = Const.CARD_WIDTH / 4, -- when overlapping, how much of next card is visible
     fanThresholdN = 2, -- switch to fan at/after this many cards
     angleSpanDeg  = 8, -- -- total span from left to right (e.g., -4..+4)
-    hove          = {
-      liftHoveredPx = 30,
+    hover          = {
+      liftPx = 30,
       liftNeighborPx = 16,
       neighborSpreadPx = 12,
-      scaleHovered = 1.08,
+      scale = 1.08,
     },
     fan           = {
       enabled     = true,
