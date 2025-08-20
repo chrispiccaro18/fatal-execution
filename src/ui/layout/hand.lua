@@ -6,6 +6,7 @@ local MODE = Const.UI.HAND_LAYOUT_MODE
 local math_min, math_max, abs = math.min, math.max, math.abs
 local General = require("util.general")
 local deepcopy = require("util.deepcopy")
+local FanLayouts = require("ui.layout.fan_layouts")
 local clamp = General.clamp
 local rad = General.rad
 
@@ -14,8 +15,8 @@ local LayoutHand = {}
 
 -- returns { mode="spaced"|"overlap"|"fan", slots={ {x,y,w,h,angle,z}, ... } }
 function LayoutHand.computeSlots(panel, n)
-  local C     = cfg.handPanel
-  local pad   = C.pad
+  local C = cfg.handPanel
+  local pad = C.pad
   local cardW = C.cardW
   local cardH = C.cardH
 
@@ -27,16 +28,49 @@ function LayoutHand.computeSlots(panel, n)
   local slots = {}
   if n == 0 then return { mode = MODE.SPACED, slots = slots } end
 
-  -- First try fully spaced (no overlap)
+  -- If fan is enabled, it's the primary layout mode.
+  local fanCfg = C.fan
+  if fanCfg.enabled then
+    if n == 1 then
+      slots[1] = { x = areaX + (areaW - cardW) / 2, y = areaY, w = cardW, h = cardH, angle = 0, z = 1 }
+      return { mode = MODE.FAN, slots = slots }
+    end
+
+    -- FAN LAYOUT (Data-driven)
+    local layoutConfig = FanLayouts[math.min(n, #FanLayouts)] -- Clamp to max defined size
+    local widthFactor = layoutConfig.width_factor or n
+    local cardData = layoutConfig.cards
+
+    -- Calculate the effective width for the hand, which determines overlap.
+    local effectiveW = cardW * widthFactor
+    -- Don't allow the hand to be wider than the available area.
+    effectiveW = math.min(effectiveW, areaW)
+
+    local startX = areaX + (areaW - effectiveW) / 2
+
+    for i = 1, n do
+      local data = cardData[i]
+      local t = (n > 1) and ((i - 1) / (n - 1)) or 0.5 -- interpolation factor [0,1]
+
+      -- Distribute cards within the effective width
+      local x = startX + t * (effectiveW - cardW)
+      local y = areaY + data.y_offset
+
+      slots[i] = { x = x, y = y, w = cardW, h = cardH, angle = data.angle, z = i }
+    end
+
+    return { mode = MODE.FAN, slots = slots }
+  end
+
+  -- LINEAR LAYOUT (Fallback if fan is disabled)
   if n == 1 then
     slots[1] = { x = areaX + (areaW - cardW) / 2, y = areaY, w = cardW, h = cardH, angle = 0, z = 1 }
     return { mode = MODE.SPACED, slots = slots }
   end
 
+  -- Try SPACED linear
   local maxSpacing = C.maxSpacingX
   local totalWSpaced = n * cardW + (n - 1) * maxSpacing
-
-  -- If fits → SPACED
   if totalWSpaced <= areaW then
     local startX = areaX + (areaW - totalWSpaced) / 2
     for i = 1, n do
@@ -46,66 +80,73 @@ function LayoutHand.computeSlots(panel, n)
     return { mode = MODE.SPACED, slots = slots }
   end
 
-  -- Else try LINEAR OVERLAP
-  -- visible step for each next card
+  -- Fallback to OVERLAP linear
   local minVis = clamp(C.minVisiblePx, 8, cardW)
-  local step   = (areaW - cardW) / (n - 1) -- how much x advance per card
-  if step >= minVis then
-    -- we can do a gentle overlap that fits
-    local totalW = cardW + (n - 1) * step
-    local startX = areaX + (areaW - totalW) / 2
-    for i = 1, n do
-      local x = startX + (i - 1) * step
-      slots[i] = { x = x, y = areaY, w = cardW, h = cardH, angle = 0, z = i }
-    end
-    return { mode = MODE.OVERLAP, slots = slots }
-  end
+  local step = (areaW - cardW) / (n - 1)
+  if step < minVis then step = minVis end -- Use hard overlap if gentle is too much
 
-  -- Else FAN (compact but readable)
-  local fanEnabled = C.fan.enabled
-  if not fanEnabled then
-    -- fallback: hard overlap using minVis
-    local totalW = cardW + (n - 1) * minVis
-    local startX = areaX + (areaW - totalW) / 2
-    for i = 1, n do
-      local x = startX + (i - 1) * minVis
-      slots[i] = { x = x, y = areaY, w = cardW, h = cardH, angle = 0, z = i }
-    end
-    return { mode = MODE.OVERLAP, slots = slots }
-  end
-
-  -- FAN LAYOUT
-  -- angles go from -max..+max around center; x spreads accordingly
-  local maxA    = C.fan.maxAngleDeg
-  -- If few cards, reduce angle; if many, cap at max
-  local span    = math_min(maxA, 4 + (n - 2)) -- simple growth rule
-  local leftA   = -span
-  local rightA  = span
-  local center  = (n + 1) / 2
-  -- compute spread so edges fit in areaW
-  -- approximate horizontal projection per step using visible strip
-  local stepFan = clamp(minVis * 0.85, 10, cardW) -- compact but readable
-  -- baseline center x
-  local centerX = areaX + areaW / 2
-  local baseY   = areaY + C.fan.liftPx
-
+  local totalW = cardW + (n - 1) * step
+  local startX = areaX + (areaW - totalW) / 2
   for i = 1, n do
-    local t = (i - center) / (center - 1) -- ~[-1,1]
-    if n == 2 then t = (i == 1) and -1 or 1 end
-    local ang  = (leftA + (rightA - leftA) * ((i - 1) / (n - 1)))
-    local aRad = rad(ang)
-    local x    = centerX + (i - center) * stepFan - cardW / 2
-    local y    = baseY - (1 - abs(t)) * (cfg.handPanel.fan.centerLift)
-    slots[i]   = { x = x, y = y, w = cardW, h = cardH, angle = ang, z = i }
+    local x = startX + (i - 1) * step
+    slots[i] = { x = x, y = areaY, w = cardW, h = cardH, angle = 0, z = i }
   end
-
-  return { mode = MODE.FAN, slots = slots }
+  return { mode = MODE.OVERLAP, slots = slots }
 end
 
--- Returns per-slot x-offsets (pixels) to apply when a slot is hovered.
--- handSlots = { mode=..., slots={ {x,y,w,h,angle,z}, ... } }
--- hoveredIndex = index of hovered card (1..n) or nil
-function LayoutHand.computeHoverOffsets(handSlots, hoveredIndex, panel)
+-- Computes the layout for a fanned hand with a hovered card.
+local function computeFanHoverLayout(panel, n, hoveredIndex, baseSlots)
+  local newSlots = deepcopy(baseSlots)
+  local C = cfg.handPanel
+  local C_hover = C.hover
+
+  -- 1. Transform the hovered card first
+  local hoveredSlot = newSlots[hoveredIndex]
+  hoveredSlot.angle = 0
+  hoveredSlot.y = hoveredSlot.y - C_hover.liftPx
+  hoveredSlot.z = n + 1
+  -- No scaling, the lift and straightening is enough emphasis
+
+  -- 2. Create two new sub-panels on either side of the hovered card
+  local pad = C.pad or 0
+  local areaX = panel.x + pad
+  local areaW = panel.w - pad * 2
+
+  local leftPanel = {
+    x = areaX,
+    y = panel.y,
+    w = hoveredSlot.x - areaX,
+    h = panel.h,
+  }
+  local rightPanel = {
+    x = hoveredSlot.x + hoveredSlot.w,
+    y = panel.y,
+    w = (areaX + areaW) - (hoveredSlot.x + hoveredSlot.w),
+    h = panel.h,
+  }
+
+  -- 3. Recursively compute new fans for the left and right sides
+  local numLeft = hoveredIndex - 1
+  if numLeft > 0 then
+    local leftLayout = LayoutHand.computeSlots(leftPanel, numLeft)
+    for i = 1, numLeft do
+      newSlots[i] = leftLayout.slots[i]
+    end
+  end
+
+  local numRight = n - hoveredIndex
+  if numRight > 0 then
+    local rightLayout = LayoutHand.computeSlots(rightPanel, numRight)
+    for i = 1, numRight do
+      newSlots[hoveredIndex + i] = rightLayout.slots[i]
+    end
+  end
+
+  return { mode = MODE.FAN, slots = newSlots }
+end
+
+-- Computes x-axis offsets for a linear hand with a hovered card.
+local function computeLinearHoverOffsets(handSlots, hoveredIndex, panel)
   local slots = handSlots.slots
   local n = #slots
   if not hoveredIndex or n <= 1 then return {} end
@@ -185,15 +226,15 @@ end
 -- Applies hover effects (enlarge, lift) and offsets to a set of slots.
 -- Returns a new table of slots.
 function LayoutHand.getHoveredLayout(panel, n, hoveredIndex)
-  -- 1. Get base layout
   local handSlots = LayoutHand.computeSlots(panel, n)
-  if n == 0 then return handSlots end
+  if not hoveredIndex or n <= 1 then return handSlots end
 
-  -- 2. Get hover offsets for pushing cards apart
-  local offsets = LayoutHand.computeHoverOffsets(handSlots, hoveredIndex, panel)
+  if handSlots.mode == MODE.FAN then
+    return computeFanHoverLayout(panel, n, hoveredIndex, handSlots.slots)
+  end
 
-  -- 3. Create the new layout by applying offsets and transformations
-  -- Make a deep copy to avoid modifying the original slots table
+  -- Default to linear hover logic
+  local offsets = computeLinearHoverOffsets(handSlots, hoveredIndex, panel)
   local newSlots = deepcopy(handSlots.slots)
 
   -- Apply x-offsets to all cards
@@ -201,8 +242,8 @@ function LayoutHand.getHoveredLayout(panel, n, hoveredIndex)
     newSlots[i].x = newSlots[i].x + (offsets[i] or 0)
   end
 
-  -- 4. Apply transformations to the hovered card
-  if hoveredIndex and newSlots[hoveredIndex] then
+  -- Apply transformations to the hovered card
+  if newSlots[hoveredIndex] then
     local cfgLocal = cfg.handPanel.hover
     local slot = newSlots[hoveredIndex]
 

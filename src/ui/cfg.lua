@@ -100,13 +100,17 @@ return {
       liftNeighborPx = 16,
       neighborSpreadPx = 12,
       scale = 1.08,
+      neighborOverlapPx = 15,
     },
-    fan           = {
-      enabled     = true,
-      maxAngleDeg = 12, -- max tip on edges
-      liftPx      = 10, -- slight lift across arc baseline
-      centerLift  = 6, -- center card gets a bit more lift
-      spreadBoost = 8, -- extra px spacing when hovered (UI state)
+    fan = {
+      enabled = true,
+      -- The pivot point for the fan is calculated relative to the hand panel:
+      -- x = panel.x + panel.w / 2
+      -- y = panel.y + panel.h + pivotYOffset
+      pivotYOffset = 300, -- pixels below the panel's bottom edge
+      radius = 350,       -- pixels from pivot to card center
+      -- Total angle of the fan adapts to hand size:
+      centerLiftPx = 10,  -- How much higher the center card is than the edges
     },
   },
 
