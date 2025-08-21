@@ -285,6 +285,7 @@ function UI.update(view, dt)
         to = deepcopy(to),
         duration = ANIMATION_INTERVALS.PLAYED_CARD_TO_CENTER,
         id = cardInstanceId,
+        postDelayFrames = ANIMATION_INTERVALS.POST_DELAY_FRAMES_FOR_CENTER_CARD,
         tag = TWEENS.PLAY_CARD_TO_CENTER,
       })
       registerTween(view, tween)

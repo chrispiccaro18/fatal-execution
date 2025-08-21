@@ -53,9 +53,10 @@ Const.UI                      = {
     CARD_DRAW_TIME = .75,      -- time to draw a single card
     CARD_HOVER_UP_TIME = 0.1,
     CARD_HOVER_DOWN_TIME = 0.5,
-    PLAYED_CARD_TO_CENTER = 2,
-    PLAYED_CARD_CENTER_PAUSE = 2,
-    PLAYED_CARD_FROM_CENTER_TO_DECK = 2,
+    PLAYED_CARD_TO_CENTER = 0.5,
+    PLAYED_CARD_CENTER_PAUSE = 1,
+    PLAYED_CARD_FROM_CENTER_TO_DECK = 0.2,
+    POST_DELAY_FRAMES_FOR_CENTER_CARD = 10
   },
   INTENTS = {
     ANIMATE_DRAW_DECK_TO_HAND = "animate_draw_deck_to_hand",

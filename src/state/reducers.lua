@@ -366,7 +366,7 @@ function Reducers.reduce(model, action)
       print("No effect by card: " .. playedCard.name .. " " .. playEffectAmountString)
     end
 
-    uiIntents[#uiIntents+1] = {
+    uiIntents[#uiIntents + 1] = {
       kind = UI_INTENTS.PLAY_CARD_PAUSE_THEN_TO_DECK,
       playedCardInstanceId = playedCardInstanceId,
       taskId = taskId,

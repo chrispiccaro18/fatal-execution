@@ -8,9 +8,9 @@ Tween.__index = Tween
 -- ---------- EASING ----------
 local Easing = {
   linear = function(t) return t end,
-  easeInQuad = function(t) return t*t end,
-  easeOutQuad = function(t) return 1 - (1 - t)*(1 - t) end,
-  easeInOutQuad = function(t) return (t < 0.5) and (2*t*t) or (1 - (-2*t+2)^2/2) end,
+  easeInQuad = function(t) return t * t end,
+  easeOutQuad = function(t) return 1 - (1 - t) * (1 - t) end,
+  easeInOutQuad = function(t) return (t < 0.5) and (2 * t * t) or (1 - (-2 * t + 2) ^ 2 / 2) end,
 }
 Tween.Easing = Easing
 
@@ -51,22 +51,25 @@ end
 -- }
 function Tween.new(spec)
   assert(spec and spec.to, "Tween.new: spec.to is required")
-  local self = setmetatable({}, Tween)
-  self._fromResolved = false
-  self.from      = nil         -- resolved lazily
-  self.to        = spec.to
-  self.duration  = spec.duration or 0.25
-  self.delay     = spec.delay or 0
-  self.ease      = spec.ease or Easing.easeOutQuad
-  self.t         = 0           -- elapsed (excludes delay)
-  self.d         = self.duration
-  self.wait      = self.delay
-  self.tag       = spec.tag
-  self.id        = spec.id
-  self.apply     = spec.apply
-  self.onComplete= spec.onComplete
-  self._fromSpec = spec.from   -- keep original for lazy resolve
-  self.done      = false
+  local self             = setmetatable({}, Tween)
+  self._fromResolved     = false
+  self.from              = nil -- resolved lazily
+  self.to                = spec.to
+  self.duration          = spec.duration or 0.25
+  self.delay             = spec.delay or 0
+  self.ease              = spec.ease or Easing.easeOutQuad
+  self.t                 = 0 -- elapsed (excludes delay)
+  self.d                 = self.duration
+  self.wait              = self.delay
+  self.tag               = spec.tag
+  self.id                = spec.id
+  self.apply             = spec.apply
+  self.onComplete        = spec.onComplete
+  self._fromSpec         = spec.from -- keep original for lazy resolve
+  self.done              = false
+  self.postDelayFrames   = math.max(0, tonumber(spec.postDelayFrames) or 0)
+  self._postWait         = nil
+  self._onCompleteCalled = false
   return self
 end
 
@@ -95,9 +98,32 @@ function Tween:update(dt)
   if self.apply then self.apply(state) end
 
   if self.t >= self.d then
+    if self.onComplete and not self._onCompleteCalled then
+      self.onComplete()
+      self._onCompleteCalled = true
+    end
+    -- If a postDelayFrames is configured, start counting frames before declaring done.
+    if self.postDelayFrames and self.postDelayFrames > 0 then
+      if self._postWait == nil then
+        self._postWait = self.postDelayFrames
+      end
+
+      -- ensure final state is applied each frame during post-delay
+      if self.apply then self.apply(self.to) end
+
+      self._postWait = self._postWait - 1
+      if self._postWait <= 0 then
+        self.done = true
+        return true
+      end
+
+      return false
+    end
+
+    -- no post-delay configured: finish immediately
     self.done = true
     if self.apply then self.apply(self.to) end
-    if self.onComplete then self.onComplete() end
+    -- if self.onComplete then self.onComplete() end
     return true
   end
 
@@ -157,7 +183,9 @@ function Sequence:update(dt)
   if self.done then return true end
   local i = self.i
   local cur = self.children[i]
-  if not cur then self.done = true; return true end
+  if not cur then
+    self.done = true; return true
+  end
 
   local finished = cur:update(dt)
   if finished then
