@@ -65,7 +65,7 @@ Const.UI                      = {
     LOCK_UI_FOR_TASK = "lock_ui_for_task",
     UNLOCK_UI_FOR_TASK = "unlock_ui_for_task",
     PLAY_CARD_TO_CENTER = "play_card_to_center",
-    PLAY_CARD_PAUSE_THEN_TO_DECK = "play_card_pause_then_to_deck",
+    -- PLAY_CARD_PAUSE_THEN_TO_DECK = "play_card_pause_then_to_deck",
   },
   TWEENS = {
     CARD_FLY = "card_fly",

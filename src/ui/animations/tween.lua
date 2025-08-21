@@ -155,18 +155,41 @@ end
 
 function Sequence:update(dt)
   if self.done then return true end
-  local i = self.i
-  local cur = self.children[i]
-  if not cur then self.done = true; return true end
 
-  local finished = cur:update(dt)
-  if finished then
-    self.i = i + 1
-    if not self.children[self.i] then
-      self.done = true
-      return true
+  -- Start processing from the current child
+  local currentChild = self.children[self.i]
+
+  -- If there are no more children, the sequence is done.
+  if not currentChild then
+    self.done = true
+    if self.onComplete then self.onComplete() end
+    return true
+  end
+
+  -- Process the current child.
+  -- If it's a function, execute it and move to the next.
+  if type(currentChild) == "function" then
+    currentChild()
+    self.i = self.i + 1
+    -- We've done something this frame, so let's try to update the *next* thing immediately.
+    -- This recursive call handles multiple callbacks in a single frame without a `while true`.
+    -- It's safe because it will always eventually hit a tween or the end of the sequence.
+    return self:update(dt)
+  else
+    -- It's a tween. Update it.
+    local finished = currentChild:update(dt)
+    if finished then
+      self.i = self.i + 1
     end
   end
+
+  -- Check if the entire sequence is now complete.
+  if self.i > #self.children then
+    self.done = true
+    if self.onComplete then self.onComplete() end
+    return true
+  end
+
   return false
 end
 

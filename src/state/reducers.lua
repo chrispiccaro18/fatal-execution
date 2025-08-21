@@ -365,12 +365,6 @@ function Reducers.reduce(model, action)
     elseif playEffectType == PLAY_EFFECT_TYPES.NONE then
       print("No effect by card: " .. playedCard.name .. " " .. playEffectAmountString)
     end
-
-    uiIntents[#uiIntents+1] = {
-      kind = UI_INTENTS.PLAY_CARD_PAUSE_THEN_TO_DECK,
-      playedCardInstanceId = playedCardInstanceId,
-      taskId = taskId,
-    }
   end
 
   if action.type == ACTIONS.PLAYED_CARD_IN_DECK then
