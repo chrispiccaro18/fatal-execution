@@ -1,3 +1,4 @@
+local Const      = require("const")
 local cfg        = require("ui.cfg")
 local HandLayout = require("ui.layout.hand")
 local DeckLayout = require("ui.layout.deck")
@@ -75,6 +76,14 @@ local function relayout(w, h, sections)
   sections.endTurn    = sliceV(sections.right, "bottom", 0.2)
 end
 
+local function getCenterRect(W, H)
+  local cardW = Const.CARD_WIDTH
+  local cardH = Const.CARD_HEIGHT
+  local x = (W - cardW) / 2 - cardW / 2
+  local y = (H - cardH) / 2
+  return rect(x, y, cardW, cardH)
+end
+
 function Layout.compute(W, H)
   local sections = {}
   relayout(W, H, sections)
@@ -97,7 +106,8 @@ function Layout.compute(W, H)
     getDestructorRect = function() return DestructorLayout.computeRect(destructorPanel) end,
     getHoverOffsets = function(handSlots, hoveredIndex, panel)
       return HandLayout.computeHoverOffsets(handSlots, hoveredIndex, panel or handPanel)
-    end
+    end,
+    getCenterRect = function() return getCenterRect(W, H) end
   }
 end
 

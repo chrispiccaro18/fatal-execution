@@ -17,6 +17,7 @@ local LOG_OPTS         = Const.LOG
 local EFFECTS_TRIGGERS = Const.EFFECTS_TRIGGERS
 local UI_INTENTS       = Const.UI.INTENTS
 local CARD_STATES      = Const.CARD_STATES
+local PLAY_EFFECT_TYPES = Const.PLAY_EFFECT_TYPES
 
 local Reducers         = {}
 
@@ -26,6 +27,24 @@ local function findTask(model, taskId)
     if task.id == taskId then return task end
   end
   return nil
+end
+
+local function createReflowMap(hand, handIndex)
+  local reflowMap = {}
+  if handIndex then
+    local newHandIndex = 1
+    for i = 1, #hand do
+      if i ~= handIndex then
+        reflowMap[newHandIndex] = hand[i].instanceId
+        newHandIndex = newHandIndex + 1
+      end
+    end
+  else
+    for i = 1, #hand do
+      reflowMap[i] = hand[i].instanceId
+    end
+  end
+  return reflowMap
 end
 
 function Reducers.reduce(model, action)
@@ -135,16 +154,12 @@ function Reducers.reduce(model, action)
         taskId = dealTask.id,
       }
 
-      local reflowMap = {}
-      for i = 1, #model.hand do
-        reflowMap[i] = model.hand[i].instanceId
-      end
       uiIntents[#uiIntents + 1] = {
         kind = UI_INTENTS.ANIMATE_HAND_REFLOW,
         newSlotCount = newSlotCount,
         oldSlotCount = #newModel.hand,
         holeIndex = newSlotCount,
-        reflowMap = reflowMap,
+        reflowMap = createReflowMap(model.hand),
       }
     else
       Log.add(newModel, "Deck empty: couldn't draw a card.", {
@@ -213,6 +228,9 @@ function Reducers.reduce(model, action)
     local newHand = Hand.removeById(newModel.hand, card.instanceId)
     newModel = immut.assign(newModel, "hand", newHand)
 
+    card.selectable = false
+    card.state = CARD_STATES.ANIMATING
+
     -- 2. Add to animatingCards
     local newAnimatingCards = AnimatingCards.add(newModel.animatingCards or AnimatingCards.empty(), card, handIndex) -- handIndex is irrelevant here
     newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
@@ -223,20 +241,13 @@ function Reducers.reduce(model, action)
       discardedCardInstanceId = card.instanceId,
       discardedCardHandIndex = handIndex,
     }
-    local reflowMap = {}
-    local newHandIndex = 1
-    for i =1, #model.hand do
-      if i ~= handIndex then
-        reflowMap[newHandIndex] = model.hand[i].instanceId
-        newHandIndex = newHandIndex + 1
-      end
-    end
+
     uiIntents[#uiIntents + 1] = {
       kind = UI_INTENTS.ANIMATE_HAND_REFLOW,
       newSlotCount = #newHand,
       oldSlotCount = #model.hand,
       holeIndex = handIndex,
-      reflowMap = reflowMap,
+      reflowMap = createReflowMap(model.hand, handIndex),
     }
   end
 
@@ -249,6 +260,8 @@ function Reducers.reduce(model, action)
       local newDestructorDeck = DestructorDeck.addBottom(newModel.destructorDeck, discardedCard)
       newModel = immut.assign(newModel, "destructorDeck", newDestructorDeck)
       newModel = immut.assign(newModel, "animatingCards", AnimatingCards.remove(newModel.animatingCards, discardedCardId))
+
+      discardedCard.state = CARD_STATES.IDLE
       local cardName = discardedCard.name or "Unknown Card"
       newModel = Log.add(newModel, ("Discarded %s."):format(cardName), {
         category = LOG_OPTS.CATEGORY.CARD_DISCARD,
@@ -256,6 +269,133 @@ function Reducers.reduce(model, action)
         visible  = true,
       })
     end
+  end
+
+  if action.type == ACTIONS.PLAY_CARD then
+    local handIndex = action.idx
+    local card = newModel.hand[handIndex]
+    if not card then error("No card at index " .. tostring(handIndex)) end
+
+    if card.noPlay then
+      newModel = Log.add(newModel, "Cannot play " .. card.name .. ".", {
+        category = LOG_OPTS.CATEGORY.CARD_PLAY,
+        severity = LOG_OPTS.SEVERITY.WARN,
+        visible  = true,
+      })
+      -- TODO: emit card shake
+
+    -- check if enough ram available
+    elseif newModel.ram >= card.cost then
+      newModel.ram = newModel.ram - card.cost
+
+      -- Card is now in transit from hand to center of screen.
+      -- 1. Remove from hand
+      local newHand = Hand.removeById(newModel.hand, card.instanceId)
+      newModel = immut.assign(newModel, "hand", newHand)
+
+      card.selectable = false
+      card.state = CARD_STATES.ANIMATING
+
+      -- 2. Add to animatingCards
+      local newAnimatingCards = AnimatingCards.add(newModel.animatingCards or AnimatingCards.empty(), card, handIndex)
+      newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
+
+      -- 3. Create task
+      local taskId = os.time()
+      newTasks[#newTasks + 1] = {
+        id = taskId,
+        kind = TASKS.PLAY_CARD,
+        cardInstanceId = card.instanceId,
+        inProgress = false,
+        complete = false,
+      }
+
+      -- 4. Create UI intents for the two separate animations
+      uiIntents[#uiIntents + 1] = {
+        kind = UI_INTENTS.PLAY_CARD_TO_CENTER,
+        playedCardInstanceId = card.instanceId,
+        playedCardHandIndex = handIndex,
+        taskId = taskId,
+      }
+
+      uiIntents[#uiIntents + 1] = {
+        kind = UI_INTENTS.ANIMATE_HAND_REFLOW,
+        newSlotCount = #newHand,
+        oldSlotCount = #model.hand,
+        holeIndex = handIndex,
+        reflowMap = createReflowMap(model.hand, handIndex),
+      }
+    else
+      newModel = Log.add(newModel, "Not enough RAM to play " .. card.name .. ".", {
+        category = LOG_OPTS.CATEGORY.CARD_PLAY,
+        severity = LOG_OPTS.SEVERITY.WARN,
+        visible  = true,
+      })
+
+      -- TODO: emit some sort of RAM pulse
+    end
+  end
+
+  if action.type == ACTIONS.PLAYED_CARD_IN_CENTER then
+    local playedCardInstanceId = action.playedCardInstanceId
+    local taskId = action.taskId
+
+    local playedCard = AnimatingCards.get(newModel.animatingCards, playedCardInstanceId)
+    local playEffectType = playedCard.playEffect and playedCard.playEffect.type or nil
+    local playEffectAmount = playedCard.playEffect and playedCard.playEffect.amount or nil
+    local playEffectAmountString = playEffectAmount and tostring(playEffectAmount) or "N/A"
+
+    if playEffectType == PLAY_EFFECT_TYPES.PROGRESS then
+      print("Progressing by " .. playEffectAmountString .. " by card: " .. playedCard.name)
+    elseif playEffectType == PLAY_EFFECT_TYPES.THREAT then
+      print("Threatening by " .. playEffectAmountString .. " by card: " .. playedCard.name)
+    elseif playEffectType == PLAY_EFFECT_TYPES.SHUFFLE_DISRUPTOR then
+      print("Shuffling destructor deck by card: " .. playedCard.name .. " " .. playEffectAmountString)
+      -- newModel.deck = Deck.shuffleDisruptor(newModel.deck)
+      -- newModel = Log.add(newModel, "Destructor Deck shuffled.", {
+      --   category = LOG_OPTS.CATEGORY.CARD_PLAY,
+      --   severity = LOG_OPTS.SEVERITY.INFO,
+      --   visible  = true,
+      -- })
+      -- TODO: emit some sort of destructor deck shuffle animation
+    elseif playEffectType == PLAY_EFFECT_TYPES.DRAW then
+      print("Drawing cards by card: " .. playedCard.name .. " " .. playEffectAmountString)
+    elseif playEffectType == PLAY_EFFECT_TYPES.NULLIFY_DESTRUCTOR then
+      print("Nullifying destructor effect by card: " .. playedCard.name .. " " .. playEffectAmountString)
+    elseif playEffectType == PLAY_EFFECT_TYPES.NONE then
+      print("No effect by card: " .. playedCard.name .. " " .. playEffectAmountString)
+    end
+
+    uiIntents[#uiIntents+1] = {
+      kind = UI_INTENTS.PLAY_CARD_PAUSE_THEN_TO_DECK,
+      playedCardInstanceId = playedCardInstanceId,
+      taskId = taskId,
+    }
+  end
+
+  if action.type == ACTIONS.PLAYED_CARD_IN_DECK then
+    local playedCardInstanceId = action.playedCardInstanceId
+    local taskId = action.taskId
+    local playedCard = AnimatingCards.get(newModel.animatingCards, playedCardInstanceId)
+
+    if playedCard then
+      local newDeck = Deck.placeOnBottom(newModel.deck, playedCard)
+      newModel = immut.assign(newModel, "deck", newDeck)
+      newModel = immut.assign(newModel, "animatingCards", AnimatingCards.remove(newModel.animatingCards, playedCardInstanceId))
+      playedCard.state = CARD_STATES.IDLE
+    end
+
+    local task = findTask(newModel, taskId)
+    if task then
+      task.complete = true
+      task.inProgress = false
+    end
+  end
+
+  if action.type == ACTIONS.TASK_IN_PROGRESS then
+    local task = findTask(newModel, action.taskId)
+    assert(task, "[reducers TASK_IN_PROGRESS]: Task not found: " .. tostring(action.taskId))
+    task.inProgress = true
   end
 
   return newModel, uiIntents, newTasks

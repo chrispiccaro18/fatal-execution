@@ -3,15 +3,13 @@ local cfg = require("ui.cfg")
 
 local MODE = Const.UI.HAND_LAYOUT_MODE
 
-local math_min, math_max, abs = math.min, math.max, math.abs
 local General = require("util.general")
 local deepcopy = require("util.deepcopy")
 local FanLayouts = require("ui.layout.fan_layouts")
+
 local clamp = General.clamp
-local rad = General.rad
 
 local LayoutHand = {}
-
 
 -- returns { mode="spaced"|"overlap"|"fan", slots={ {x,y,w,h,angle,z}, ... } }
 function LayoutHand.computeSlots(panel, n)
@@ -97,6 +95,7 @@ end
 -- Computes the layout for a fanned hand with a hovered card using data-driven modifiers.
 local function computeFanHoverLayout(panel, n, hoveredIndex, baseSlots)
   local newSlots = deepcopy(baseSlots)
+  assert(newSlots, "[computeFanHoverLayout]: Failed to deepcopy baseSlots")
   local C = cfg.handPanel
   local C_hover = C.hover
   local modifiers = FanLayouts.hover_modifiers
@@ -220,6 +219,7 @@ function LayoutHand.getHoveredLayout(panel, n, hoveredIndex)
   -- Default to linear hover logic
   local offsets = computeLinearHoverOffsets(handSlots, hoveredIndex, panel)
   local newSlots = deepcopy(handSlots.slots)
+  assert(newSlots, "[getHoveredLayout]: Failed to deepcopy handSlots.slots")
 
   -- Apply x-offsets to all cards
   for i = 1, n do

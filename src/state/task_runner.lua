@@ -31,12 +31,23 @@ function TaskRunner.step(model, view, dt)
           ui[#ui + 1] = { kind = UI_INTENTS.UNLOCK_UI_FOR_TASK, taskId = task.id }
           table.remove(model.tasks, 1)
         end
-      -- elseif task.kind == TASKS.DISCARD_CARD then
-      --   if task.remaining > 0 then
-      --     produced[#produced + 1] = { type = ACTIONS.DISCARD_CARD, taskId = task.id, cardInstanceId = task.cardInstanceId }
-      --   elseif task.remaining <= 0 then
-      --     table.remove(model.tasks, 1)
-      --   end
+      elseif task.kind == TASKS.PLAY_CARD then
+        if task.complete then
+          ui[#ui + 1] = { kind = UI_INTENTS.UNLOCK_UI_FOR_TASK, taskId = task.id }
+          table.remove(model.tasks, 1)
+        else
+          produced[#produced + 1] = { type = ACTIONS.TASK_IN_PROGRESS, taskId = task.id }
+          if view and view.lockedTasks and not view.lockedTasks[task.id] then
+            ui[#ui + 1] = { kind = UI_INTENTS.LOCK_UI_FOR_TASK, taskId = task.id }
+          end
+        end
+
+        -- elseif task.kind == TASKS.DISCARD_CARD then
+        --   if task.remaining > 0 then
+        --     produced[#produced + 1] = { type = ACTIONS.DISCARD_CARD, taskId = task.id, cardInstanceId = task.cardInstanceId }
+        --   elseif task.remaining <= 0 then
+        --     table.remove(model.tasks, 1)
+        --   end
       else
         -- Unknown task
         -- log to debug

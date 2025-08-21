@@ -57,29 +57,33 @@ local function deepcopy(value, seen, opts)
   for k, v in pairs(value) do
     local kt, vt = type(k), type(v)
 
-    -- Optionally skip function/userdata keys/values for save safety
-    if not (kt == "function" and opts.skipFns ~= false)
-       and not (kt == "userdata" and opts.skipUd ~= false) then
-      if not (vt == "function" and opts.skipFns ~= false)
-         and not (vt == "userdata" and opts.skipUd ~= false) then
+    -- Skip keys or values that are functions/userdata if requested
+    local skipKey = (kt == "function" and opts.skipFns ~= false)
+      or (kt == "userdata" and opts.skipUd ~= false)
+    local skipValue = (vt == "function" and opts.skipFns ~= false)
+      or (vt == "userdata" and opts.skipUd ~= false)
 
-        local newKey = deepcopy(k, seen, opts and {
-          skipFns  = opts.skipFns,
-          skipUd   = opts.skipUd,
-          copyMeta = false,      -- keys rarely need metatables
-          maxDepth = opts.maxDepth and (opts.maxDepth - 1) or nil
-        })
+    if not skipKey and not skipValue then
+      local nextOpts = {
+        skipFns = opts.skipFns,
+        skipUd = opts.skipUd,
+        copyMeta = opts.copyMeta, -- Propagate metatable copy option
+        maxDepth = opts.maxDepth and (opts.maxDepth - 1) or nil,
+      }
 
-        local newVal = deepcopy(v, seen, opts and {
-          skipFns  = opts.skipFns,
-          skipUd   = opts.skipUd,
-          copyMeta = false,
-          maxDepth = opts.maxDepth and (opts.maxDepth - 1) or nil
-        })
+      -- Keys rarely need metatables, so override for key copy
+      local keyOpts = {
+        skipFns = nextOpts.skipFns,
+        skipUd = nextOpts.skipUd,
+        copyMeta = false,
+        maxDepth = nextOpts.maxDepth,
+      }
 
-        if newKey ~= nil then
-          result[newKey] = newVal
-        end
+      local newKey = deepcopy(k, seen, keyOpts)
+      local newVal = deepcopy(v, seen, nextOpts)
+
+      if newKey ~= nil then
+        result[newKey] = newVal
       end
     end
   end

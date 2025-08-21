@@ -110,7 +110,6 @@ function UI.getRectForInstance(view, instanceId)
   return nil
 end
 
-
 -- The single source of truth for a card's position *within the hand*.
 function UI.getCardInHandRect(view, handIndex)
   -- Guard: require anchors/slots
@@ -266,6 +265,89 @@ function UI.update(view, dt)
         end
         view.hover.animating[uiIntent.discardedCardHandIndex] = nil
       end
+
+    elseif uiIntent.kind == INTENTS.PLAY_CARD_TO_CENTER then
+      local cardInstanceId = uiIntent.playedCardInstanceId
+      local cardIndex = uiIntent.playedCardHandIndex
+      local taskId = uiIntent.taskId
+
+      local from = UI.getCardInHandRect(view, cardIndex)
+      local to = view.anchors.getCenterRect()
+
+      local onCompletePayload = {
+        type = ACTIONS.PLAYED_CARD_IN_CENTER,
+        playedCardInstanceId = cardInstanceId,
+        taskId = taskId
+      }
+
+      local tween = Tween.new({
+        from = deepcopy(from),
+        to = deepcopy(to),
+        duration = ANIMATION_INTERVALS.PLAYED_CARD_TO_CENTER,
+        id = cardInstanceId,
+        tag = TWEENS.PLAY_CARD_TO_CENTER,
+      })
+      registerTween(view, tween)
+      tween.onComplete = function()
+        table.insert(view.signals, onCompletePayload)
+      end
+
+      table.insert(view.active, tween)
+
+      -- Snapshot current visible hand rects BEFORE clearing hover/spread state.
+      -- This snapshot is consumed by the upcoming ANIMATE_HAND_REFLOW so reflow
+      -- animates from the actual on-screen positions.
+      if view.anchors and view.anchors.handSlots and view.anchors.handSlots.slots then
+        local slotCount = #view.anchors.handSlots.slots
+        view._last_hand_rects = {}
+        for i = 1, slotCount do
+          local r = UI.getCardInHandRect(view, i)
+          view._last_hand_rects[i] = r and deepcopy(r) or nil
+        end
+      end
+
+      if view.hover.currentHandIndex == cardIndex then
+        -- If the hovered card is being discarded, reset hover.
+        view.hover.currentHandIndex = nil
+        view.hover.currentInstanceId = nil
+        if view.hover.animating[cardIndex] then
+          unregisterTween(view, view.hover.animating[cardIndex])
+        end
+        view.hover.animating[cardIndex] = nil
+      end
+
+    elseif uiIntent.kind == INTENTS.PLAY_CARD_PAUSE_THEN_TO_DECK then
+      local cardInstanceId = uiIntent.playedCardInstanceId
+      local taskId = uiIntent.taskId
+
+      local from = view.anchors.getCenterRect()
+      local to = view.anchors.getDeckRect()
+
+      local onCompletePayload = {
+        type = ACTIONS.PLAYED_CARD_IN_DECK,
+        playedCardInstanceId = cardInstanceId,
+        taskId = taskId
+      }
+
+      local totalDuration =
+        ANIMATION_INTERVALS.PLAYED_CARD_CENTER_PAUSE +
+        ANIMATION_INTERVALS.PLAYED_CARD_FROM_CENTER_TO_DECK
+
+      local tween = Tween.new({
+        from = deepcopy(from),
+        to = deepcopy(to),
+        delay = ANIMATION_INTERVALS.PLAYED_CARD_CENTER_PAUSE,
+        duration = totalDuration,
+        id = cardInstanceId,
+        tag = TWEENS.PLAY_CARD_PAUSE_THEN_TO_DECK,
+      })
+      registerTween(view, tween)
+      tween.onComplete = function()
+        table.insert(view.signals, onCompletePayload)
+      end
+
+      table.insert(view.active, tween)
+
     elseif uiIntent.kind == INTENTS.ANIMATE_HAND_REFLOW then
       view.inputLocked = true
 
@@ -354,9 +436,11 @@ function UI.update(view, dt)
       end
 
       view.anchors.handSlots = newSlotsAndMode
+
     elseif uiIntent.kind == INTENTS.LOCK_UI_FOR_TASK then
       view.lockedTasks[uiIntent.taskId] = true
       view.inputLocked = true
+
     elseif uiIntent.kind == INTENTS.UNLOCK_UI_FOR_TASK then
       view.lockedTasks[uiIntent.taskId] = nil
     end

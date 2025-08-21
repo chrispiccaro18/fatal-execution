@@ -32,13 +32,17 @@ Const.DISPATCH_ACTIONS        = {
   DISCARD_CARD = "discard_card",
   FINISH_CARD_DISCARD = "finish_card_discard",
   PLAY_CARD = "play_card",
+  PLAYED_CARD_IN_CENTER = "played_card_in_center",
+  PLAYED_CARD_IN_DECK = "played_card_in_deck",
   END_TURN = "end_turn",
   LOG_DEBUG  = "log_debug",
+  TASK_IN_PROGRESS = "task_in_progress",
 }
 
 Const.TASKS                = {
   DEAL_CARDS = "deal_cards",
-  DISCARD_CARD = "discard_card"
+  DISCARD_CARD = "discard_card",
+  PLAY_CARD = "play_card",
 }
 
 Const.UI                      = {
@@ -49,6 +53,9 @@ Const.UI                      = {
     CARD_DRAW_TIME = .75,      -- time to draw a single card
     CARD_HOVER_UP_TIME = 0.1,
     CARD_HOVER_DOWN_TIME = 0.5,
+    PLAYED_CARD_TO_CENTER = 2,
+    PLAYED_CARD_CENTER_PAUSE = 2,
+    PLAYED_CARD_FROM_CENTER_TO_DECK = 2,
   },
   INTENTS = {
     ANIMATE_DRAW_DECK_TO_HAND = "animate_draw_deck_to_hand",
@@ -57,6 +64,8 @@ Const.UI                      = {
     SET_HOVERED_CARD = "set_hovered_card",
     LOCK_UI_FOR_TASK = "lock_ui_for_task",
     UNLOCK_UI_FOR_TASK = "unlock_ui_for_task",
+    PLAY_CARD_TO_CENTER = "play_card_to_center",
+    PLAY_CARD_PAUSE_THEN_TO_DECK = "play_card_pause_then_to_deck",
   },
   TWEENS = {
     CARD_FLY = "card_fly",
@@ -65,6 +74,8 @@ Const.UI                      = {
     CARD_DISCARD = "card_discard",
     CARD_HOVER_UP = "card_hover_up",
     CARD_HOVER_DOWN = "card_hover_down",
+    PLAY_CARD_TO_CENTER = "play_card_to_center",
+    PLAY_CARD_PAUSE_THEN_TO_DECK = "play_card_pause_then_to_deck",
   },
   HAND_LAYOUT_MODE = {
     SPACED = "spaced",
@@ -271,6 +282,7 @@ Const.LOG                     =
     TASK_DEBUG = "task_debug",
     CARD_DRAW = "card_draw",
     CARD_DISCARD = "card_discard",
+    CARD_PLAY = "card_play",
     EFFECT = "effect"
   }
 }

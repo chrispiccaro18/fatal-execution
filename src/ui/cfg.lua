@@ -96,7 +96,7 @@ return {
     fanThresholdN = 2, -- switch to fan at/after this many cards
     angleSpanDeg  = 8, -- -- total span from left to right (e.g., -4..+4)
     hover          = {
-      liftPx = 30,
+      liftPx = 10,
       liftNeighborPx = 16,
       neighborSpreadPx = 12,
       scale = 1.08,
