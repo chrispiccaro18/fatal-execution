@@ -15,13 +15,13 @@
 return {
   hover_modifiers = {
     -- For immediate neighbors (distance = 1)
-    [1] = { x_offset = 55, y_offset = 5, angle_offset = 0 },
+    [1] = { x_offset = 55, y_offset = 0, angle_offset = 0 },
     -- For cards 2 away
-    [2] = { x_offset = 40, y_offset = 2, angle_offset = 0 },
+    [2] = { x_offset = 40, y_offset = 0, angle_offset = 0 },
     -- For cards 3 away
     [3] = { x_offset = 25, y_offset = 0, angle_offset = 0 },
     -- For cards 4+ away
-    [4] = { x_offset = 15, y_offset = 0, angle_offset = 0 },
+    [4] = { x_offset = 0, y_offset = 0, angle_offset = 0 },
   },
 
   [1] = {
