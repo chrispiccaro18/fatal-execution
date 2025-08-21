@@ -1,3 +1,4 @@
+local deepcopy = require("util.deep_copy")
 local SystemDefs = require("data.systems")
 
 local Systems = {}
@@ -21,12 +22,14 @@ function Systems.initFromIds(systemRefs)
   return realized
 end
 
--- Same increment function you had, now pure and returning delta + completed
-function Systems.incrementProgress(systemList, currentSystemIndex, amount)
-  local newList, deltaUsed, completed = {}, 0, false
+function Systems.incrementProgress(model, amount)
+  local newSystems, deltaUsed, completed = {}, 0, false
+  local systemList = deepcopy(model.systems)
+  local currentSystemIndex = model.currentSystemIndex
+
   for i, sys in ipairs(systemList) do
     if i ~= currentSystemIndex then
-      newList[i] = sys
+      newSystems[i] = sys
     else
       local tgt = {
         id=sys.id, name=sys.name, required=sys.required,
@@ -39,10 +42,10 @@ function Systems.incrementProgress(systemList, currentSystemIndex, amount)
       tgt.progress = after
       deltaUsed = after - before
       completed = (after >= tgt.required)
-      newList[i] = tgt
+      newSystems[i] = tgt
     end
   end
-  return newList, deltaUsed, completed
+  return newSystems, deltaUsed, completed
 end
 
 return Systems

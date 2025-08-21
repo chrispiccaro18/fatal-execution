@@ -265,7 +265,6 @@ function UI.update(view, dt)
         end
         view.hover.animating[uiIntent.discardedCardHandIndex] = nil
       end
-
     elseif uiIntent.kind == INTENTS.PLAY_CARD_TO_CENTER then
       local cardInstanceId = uiIntent.playedCardInstanceId
       local cardIndex = uiIntent.playedCardHandIndex
@@ -275,15 +274,36 @@ function UI.update(view, dt)
       local toCenter = view.anchors.getCenterRect()
       local toDeck = view.anchors.getDeckRect()
 
+      local cardToCenterTween = Tween.new({
+        from = deepcopy(fromHand),
+        to = deepcopy(toCenter),
+        duration = ANIMATION_INTERVALS.PLAYED_CARD_TO_CENTER,
+        id = cardInstanceId,
+        tag = TWEENS.PLAY_CARD_TO_CENTER,
+      })
+
+      local pauseThenToDeckTween = Tween.new({
+        from = deepcopy(toCenter),
+        to = deepcopy(toDeck),
+        delay = ANIMATION_INTERVALS.PLAYED_CARD_CENTER_PAUSE,
+        duration = ANIMATION_INTERVALS.PLAYED_CARD_CENTER_PAUSE + ANIMATION_INTERVALS.PLAYED_CARD_FROM_CENTER_TO_DECK,
+        tag = TWEENS.PLAY_CARD_PAUSE_THEN_TO_DECK,
+        id = cardInstanceId,
+      })
+
       local onPlayCardInCenter = function()
+        unregisterTween(view, cardToCenterTween)
         table.insert(view.signals, {
           type = ACTIONS.PLAYED_CARD_IN_CENTER,
           playedCardInstanceId = cardInstanceId,
           taskId = taskId
         })
+        registerTween(view, pauseThenToDeckTween)
       end
 
+
       local onPlayCardInDeck = function()
+        unregisterTween(view, pauseThenToDeckTween)
         table.insert(view.signals, {
           type = ACTIONS.PLAYED_CARD_IN_DECK,
           playedCardInstanceId = cardInstanceId,
@@ -293,35 +313,16 @@ function UI.update(view, dt)
 
       local sequence = Tween.sequence({
         -- 1. Animate from hand to center
-        Tween.new({
-          from = deepcopy(fromHand),
-          to = deepcopy(toCenter),
-          duration = ANIMATION_INTERVALS.PLAYED_CARD_TO_CENTER,
-          id = cardInstanceId,
-          tag = TWEENS.PLAY_CARD_TO_CENTER,
-        }),
+        cardToCenterTween,
         -- 2. Signal that the card is in the center to apply effects
         onPlayCardInCenter,
-        -- 3. Pause in the center
-        Tween.new({
-          from = deepcopy(toCenter),
-          to = deepcopy(toCenter),
-          delay = ANIMATION_INTERVALS.PLAYED_CARD_CENTER_PAUSE,
-          duration = 0,
-          id = cardInstanceId,
-        }),
-        -- 4. Animate from center to deck
-        Tween.new({
-          from = deepcopy(toCenter),
-          to = deepcopy(toDeck),
-          duration = ANIMATION_INTERVALS.PLAYED_CARD_FROM_CENTER_TO_DECK,
-          id = cardInstanceId,
-          tag = TWEENS.PLAY_CARD_PAUSE_THEN_TO_DECK,
-          onComplete = onPlayCardInDeck,
-        })
+        -- 3. Pause in the center then go to deck
+        pauseThenToDeckTween,
+        -- 4. Final callback
+        onPlayCardInDeck
       })
 
-      registerTween(view, sequence)
+      registerTween(view, cardToCenterTween)
       table.insert(view.active, sequence)
 
       -- Snapshot current visible hand rects BEFORE clearing hover/spread state.
@@ -345,7 +346,6 @@ function UI.update(view, dt)
         end
         view.hover.animating[cardIndex] = nil
       end
-
     elseif uiIntent.kind == INTENTS.ANIMATE_HAND_REFLOW then
       view.inputLocked = true
 
@@ -434,11 +434,9 @@ function UI.update(view, dt)
       end
 
       view.anchors.handSlots = newSlotsAndMode
-
     elseif uiIntent.kind == INTENTS.LOCK_UI_FOR_TASK then
       view.lockedTasks[uiIntent.taskId] = true
       view.inputLocked = true
-
     elseif uiIntent.kind == INTENTS.UNLOCK_UI_FOR_TASK then
       view.lockedTasks[uiIntent.taskId] = nil
     end

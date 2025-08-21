@@ -194,7 +194,8 @@ function Sequence:update(dt)
 end
 
 local function findTweenInGroup(group, cardId)
-  if group.id == cardId then return group end
+  if type(group) ~= "table" then return nil end
+  if group.id == cardId and not group.done then return group end
   if group.children then
     for _, child in ipairs(group.children) do
       local found = findTweenInGroup(child, cardId)

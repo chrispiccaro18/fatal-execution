@@ -6,7 +6,9 @@ local deepcopy         = require("util.deepcopy")
 local Log              = require("game_state.log")
 local Hand             = require("game_state.hand")
 local Deck             = require("game_state.deck")
+local Systems          = require("game_state.systems")
 local DestructorDeck   = require("game_state.destructor_deck")
+
 local Effects          = require("game_state.derived.effects")
 local AnimatingCards   = require("game_state.temp.animating_cards")
 
@@ -338,7 +340,7 @@ function Reducers.reduce(model, action)
 
   if action.type == ACTIONS.PLAYED_CARD_IN_CENTER then
     local playedCardInstanceId = action.playedCardInstanceId
-    local taskId = action.taskId
+    -- local taskId = action.taskId
 
     local playedCard = AnimatingCards.get(newModel.animatingCards, playedCardInstanceId)
     local playEffectType = playedCard.playEffect and playedCard.playEffect.type or nil
@@ -346,7 +348,9 @@ function Reducers.reduce(model, action)
     local playEffectAmountString = playEffectAmount and tostring(playEffectAmount) or "N/A"
 
     if playEffectType == PLAY_EFFECT_TYPES.PROGRESS then
-      print("Progressing by " .. playEffectAmountString .. " by card: " .. playedCard.name)
+      -- print("Progressing by " .. playEffectAmountString .. " by card: " .. playedCard.name)
+      local newSystems, delta, completed = Systems.incrementProgress(newModel, playEffectAmount)
+      newModel = immut.assign(newModel, "systems", newSystems)
     elseif playEffectType == PLAY_EFFECT_TYPES.THREAT then
       print("Threatening by " .. playEffectAmountString .. " by card: " .. playedCard.name)
     elseif playEffectType == PLAY_EFFECT_TYPES.SHUFFLE_DISRUPTOR then
