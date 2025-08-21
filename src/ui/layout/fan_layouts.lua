@@ -4,9 +4,26 @@
 -- `cards`: A list of definitions for each card in the hand.
 --   `angle`: The rotation of the card in degrees.
 --   `y_offset`: How many pixels to push the card down. A positive value moves it down.
---               This is used to counteract the visual "lift" from rotation.
+--
+-- `hover_modifiers`: Defines how unhovered cards should be pushed away from the
+-- hovered card, based on their distance from it.
+--   `x_offset`: Horizontal push away from the hovered card.
+--   `y_offset`: Vertical push (positive is down).
+--   `angle_offset`: Degrees to add to the card's base angle. A positive value
+--                   rotates the card clockwise.
 
 return {
+  hover_modifiers = {
+    -- For immediate neighbors (distance = 1)
+    [1] = { x_offset = 55, y_offset = 5, angle_offset = 0 },
+    -- For cards 2 away
+    [2] = { x_offset = 40, y_offset = 2, angle_offset = 0 },
+    -- For cards 3 away
+    [3] = { x_offset = 25, y_offset = 0, angle_offset = 0 },
+    -- For cards 4+ away
+    [4] = { x_offset = 15, y_offset = 0, angle_offset = 0 },
+  },
+
   [1] = {
     width_factor = 1,
     cards = {

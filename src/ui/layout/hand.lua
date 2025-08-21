@@ -94,51 +94,35 @@ function LayoutHand.computeSlots(panel, n)
   return { mode = MODE.OVERLAP, slots = slots }
 end
 
--- Computes the layout for a fanned hand with a hovered card.
+-- Computes the layout for a fanned hand with a hovered card using data-driven modifiers.
 local function computeFanHoverLayout(panel, n, hoveredIndex, baseSlots)
   local newSlots = deepcopy(baseSlots)
   local C = cfg.handPanel
   local C_hover = C.hover
+  local modifiers = FanLayouts.hover_modifiers
 
-  -- 1. Transform the hovered card first
+  -- 1. Transform the hovered card
   local hoveredSlot = newSlots[hoveredIndex]
   hoveredSlot.angle = 0
-  hoveredSlot.y = hoveredSlot.y - C_hover.liftPx
+  hoveredSlot.y = hoveredSlot.y - C_hover.liftPx - FanLayouts[#baseSlots].cards[hoveredIndex].y_offset
   hoveredSlot.z = n + 1
-  -- No scaling, the lift and straightening is enough emphasis
 
-  -- 2. Create two new sub-panels on either side of the hovered card
-  local pad = C.pad or 0
-  local areaX = panel.x + pad
-  local areaW = panel.w - pad * 2
+  -- 2. Apply modifiers to all other cards
+  for i = 1, n do
+    if i ~= hoveredIndex then
+      local slot = newSlots[i]
+      local distance = math.abs(i - hoveredIndex)
+      local mod = modifiers[math.min(distance, #modifiers)] -- Clamp to max defined modifier
 
-  local leftPanel = {
-    x = areaX,
-    y = panel.y,
-    w = hoveredSlot.x - areaX,
-    h = panel.h,
-  }
-  local rightPanel = {
-    x = hoveredSlot.x + hoveredSlot.w,
-    y = panel.y,
-    w = (areaX + areaW) - (hoveredSlot.x + hoveredSlot.w),
-    h = panel.h,
-  }
+      if mod then
+        local direction = (i < hoveredIndex) and -1 or 1 -- -1 for left, 1 for right
 
-  -- 3. Recursively compute new fans for the left and right sides
-  local numLeft = hoveredIndex - 1
-  if numLeft > 0 then
-    local leftLayout = LayoutHand.computeSlots(leftPanel, numLeft)
-    for i = 1, numLeft do
-      newSlots[i] = leftLayout.slots[i]
-    end
-  end
-
-  local numRight = n - hoveredIndex
-  if numRight > 0 then
-    local rightLayout = LayoutHand.computeSlots(rightPanel, numRight)
-    for i = 1, numRight do
-      newSlots[hoveredIndex + i] = rightLayout.slots[i]
+        slot.x = slot.x + mod.x_offset * direction
+        slot.y = slot.y + mod.y_offset
+        -- For cards on the left (negative angle), a positive offset makes them more vertical.
+        -- For cards on the right (positive angle), a negative offset makes them more vertical.
+        slot.angle = slot.angle + mod.angle_offset * direction
+      end
     end
   end
 

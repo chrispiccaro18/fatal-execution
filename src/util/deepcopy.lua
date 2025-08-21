@@ -7,22 +7,20 @@
 -- -- Deep copy but drop functions/userdata (safer saves; default behavior)
 -- local clean = deepcopy(Store.model, nil, { skipFns = true, skipUd = true })
 
--- -- With a depth cap (rarely needed, but here if you want it)
+-- -- With a depth cap
 -- local shallowish = deepcopy(Store.model, nil, { maxDepth = 3 })
 -- TIPS
 -- Model saves: use defaults (skipFns=true, skipUd=true, copyMeta=false) to keep files clean.
 
 -- Runtime cloning for edits: defaults are still fine; if you actually rely on metatables, set copyMeta=true only for those structures.
 
--- Performance: use deep copy for snapshots; for routine updates prefer shallow copy of containers (your util.copy) and keep children immutable.
+-- Performance: use deep copy for snapshots; for routine updates prefer shallow copy of containers (util.copy) and keep children immutable.
 
 -- Deep copy for plain Lua tables used in the game model.
 -- - Handles cycles (via `seen`).
 -- - Copies both keys and values.
 -- - Skips metatables by default (safe for serialization).
 -- - Optionally skip functions/userdata to keep saves clean.
-
-
 local function deepcopy(value, seen, opts)
   -- opts:
   --   skipFns   = true|false (default true)  -- do not copy function values/keys
