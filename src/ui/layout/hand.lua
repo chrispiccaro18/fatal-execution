@@ -210,7 +210,7 @@ end
 -- Returns a new table of slots.
 function LayoutHand.getHoveredLayout(panel, n, hoveredIndex)
   local handSlots = LayoutHand.computeSlots(panel, n)
-  if not hoveredIndex or n <= 1 then return handSlots end
+  if not hoveredIndex or n < 1 then return handSlots end
 
   if handSlots.mode == MODE.FAN then
     return computeFanHoverLayout(panel, n, hoveredIndex, handSlots.slots)

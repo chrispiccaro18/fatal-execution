@@ -69,6 +69,7 @@ function Model.new(seed, runConfigOpts)
     -- REALIZED CONTENT
     deck               = nil, -- will be initialized later with generated Ids for cards
     hand               = Hand.init(),
+    -- TODO: need a max hand limit of 10 and rename handSize to maxBeginTurnDrawTo (or a better name)
     handSize           = runConfig.handSize,
 
     systems            = systems,
