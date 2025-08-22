@@ -51,7 +51,14 @@ fi
 
 echo -e "🚀 ${GREEN}Building all targets...${NC}"
 ./scripts/build_steam.sh
-./scripts/build_appimage.sh
+# ./scripts/build_appimage.sh
+
+if [[ "$(uname)" == "Darwin" ]]; then
+  echo -e "🍎 ${GREEN}Building macOS...${NC}"
+  ./scripts/build_macos.sh
+else
+  echo -e "🍎 ${YELLOW}Skipping macOS build (not on macOS).${NC}"
+fi
 
 echo "$VERSION" > "$LAST_FILE"
 
