@@ -51,7 +51,7 @@ local function createNewProfile(result)
 end
 
 local function deleteProfile(result)
-  local deleteText = "delete the " .. StartScreen.profile.name .. " profile"
+  local deleteText = "delete the " .. Profiles.getName(result.index) .. " profile"
   local onConfirm = function()
     Profiles.delete(result.index)
     if StartScreen.activeIndex == result.index then
