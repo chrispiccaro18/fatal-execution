@@ -51,7 +51,12 @@ fi
 
 echo -e "🚀 ${GREEN}Building all targets...${NC}"
 ./scripts/build_steam.sh
-# ./scripts/build_appimage.sh
+
+if [[ "$(uname)" == "Linux" ]]; then
+  ./scripts/build_appimage.sh
+else
+  echo -e "${YELLOW}Skipping Linux build (not on Linux).${NC}"
+fi
 
 if [[ "$(uname)" == "Darwin" ]]; then
   echo -e "🍎 ${GREEN}Building macOS...${NC}"
