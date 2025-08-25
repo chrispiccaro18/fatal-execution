@@ -19,8 +19,13 @@ function TaskRunner.step(model, view, dt)
   local tasks = model.tasks
   if not tasks or #tasks == 0 then return produced, ui end
 
-  for _, task in ipairs(tasks) do
-    if not task.inProgress then
+  for i = #tasks, 1, -1 do
+    local task = tasks[i]
+    if task.inProgress then
+      if task.kind == TASKS.DEAL_CARDS and task.remaining <= 0 then
+        task.inProgress = false
+      end
+    else
       if task.kind == TASKS.DEAL_CARDS then
         if task.remaining > 0 then
           if view and view.lockedTasks and not view.lockedTasks[task.id] then
@@ -29,12 +34,12 @@ function TaskRunner.step(model, view, dt)
           produced[#produced + 1] = { type = ACTIONS.DRAW_CARD, taskId = task.id }
         elseif task.remaining <= 0 then
           ui[#ui + 1] = { kind = UI_INTENTS.UNLOCK_UI_FOR_TASK, taskId = task.id }
-          table.remove(model.tasks, 1)
+          table.remove(model.tasks, i)
         end
       elseif task.kind == TASKS.PLAY_CARD then
         if task.complete then
           ui[#ui + 1] = { kind = UI_INTENTS.UNLOCK_UI_FOR_TASK, taskId = task.id }
-          table.remove(model.tasks, 1)
+          table.remove(model.tasks, i)
         else
           produced[#produced + 1] = { type = ACTIONS.TASK_IN_PROGRESS, taskId = task.id }
           if view and view.lockedTasks and not view.lockedTasks[task.id] then
@@ -46,7 +51,7 @@ function TaskRunner.step(model, view, dt)
         --   if task.remaining > 0 then
         --     produced[#produced + 1] = { type = ACTIONS.DISCARD_CARD, taskId = task.id, cardInstanceId = task.cardInstanceId }
         --   elseif task.remaining <= 0 then
-        --     table.remove(model.tasks, 1)
+        --     table.remove(model.tasks, i)
         --   end
       else
         -- Unknown task
@@ -57,7 +62,7 @@ function TaskRunner.step(model, view, dt)
           entry    = ("Discarded unknown task kind: %s"):format(tostring(task.kind)),
         }
         -- → discard to avoid stalling the queue
-        table.remove(model.tasks, 1)
+        table.remove(model.tasks, i)
       end
     end
   end

@@ -71,6 +71,25 @@ function DestructorDeck.shuffle(deck, rngStream)
   return shuffledClone(deck, rngStream)
 end
 
+function DestructorDeck.biasedShuffle(deck, rngStream)
+  if #deck < 2 then
+    return shuffledClone(deck, rngStream)
+  end
+
+  local topCard = deck[1]
+  local out = shuffledClone(deck, rngStream)
+
+  if topCard.instanceId == out[1].instanceId then
+    -- 90% of the time move it to another position
+    if RNG.nextInt(rngStream, 1, 10) <= 9 then
+      table.remove(out, 1)
+      local newIndex = RNG.nextInt(rngStream, 2, #out + 1)
+      table.insert(out, newIndex, topCard)
+    end
+  end
+  return out
+end
+
 -- (Optional) add to top
 function DestructorDeck.addTop(deck, card)
   local out = { card }

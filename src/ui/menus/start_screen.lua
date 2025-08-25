@@ -183,6 +183,8 @@ function StartScreen.keypressed(key)
       local result = EditProfile.returnPressed(StartScreen.nameInput)
       createNewProfile(result)
     end
+  elseif key == "escape" then
+    love.event.quit()
   end
 end
 

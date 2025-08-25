@@ -130,9 +130,7 @@ end
 
 function GameLoop.keypressed(key)
   if Menu.keypressed(key) then return end
-  if key == "escape" then
-    love.event.quit()
-  elseif key == "m" then
+  if key == "escape" or key == "m" then
     Menu.toggle()
   end
 end

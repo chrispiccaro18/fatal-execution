@@ -281,6 +281,7 @@ Const.LOG                     =
   CATEGORY = {
     GENERAL = "general",
     TASK_DEBUG = "task_debug",
+    END_GAME = "end_game",
     CARD_DRAW = "card_draw",
     CARD_DISCARD = "card_discard",
     CARD_PLAY = "card_play",

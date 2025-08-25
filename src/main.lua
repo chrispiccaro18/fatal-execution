@@ -79,22 +79,12 @@ function love.draw()
   DebugOverlay.draw(Display)
 end
 
-local function inputLocked()
-  -- Central gate (NEW). Store.view is ephemeral/UI state.
-  return Store.view and Store.view.inputLocked
-end
-
 function love.mousepressed(x, y, button)
   if OptionsMenu.isOpen then
     OptionsMenu.mousepressed(x, y, button)
     return
   elseif ConfirmDialog.isOpen then
     ConfirmDialog.mousepressed(x, y, button)
-    return
-  end
-
-  if inputLocked() then
-    -- swallow clicks while animations/tasks are mid-step
     return
   end
 
@@ -119,10 +109,7 @@ function love.keypressed(key)
   if CurrentScreen == CURRENT_SCREEN.START then
     StartScreen.keypressed(key)
   elseif CurrentScreen == CURRENT_SCREEN.GAME then
-    -- Optional: allow some keys while locked (e.g., pause menu).
-    if not inputLocked() or key == "escape" or key == "m" then
       GameLoop.keypressed(key)
-    end
   end
 
   if key == "f3" then

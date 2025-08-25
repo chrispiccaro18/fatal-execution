@@ -1,9 +1,8 @@
+local copy = require("util.copy")
 local deepcopy = require("util.deepcopy")
 local SystemDefs = require("data.systems")
 
 local Systems = {}
-
-local function copy(t) local r={}; for k,v in pairs(t) do r[k]=v end; return r end
 
 -- Realize from a list of {id=...} coming from the ship preset
 function Systems.initFromIds(systemRefs)
@@ -22,10 +21,9 @@ function Systems.initFromIds(systemRefs)
   return realized
 end
 
-function Systems.incrementProgress(model, amount)
+function Systems.incrementProgress(systems, currentSystemIndex, amount)
   local newSystems, deltaUsed, completed = {}, 0, false
-  local systemList = deepcopy(model.systems)
-  local currentSystemIndex = model.currentSystemIndex
+  local systemList = deepcopy(systems)
 
   for i, sys in ipairs(systemList) do
     if i ~= currentSystemIndex then
@@ -42,6 +40,7 @@ function Systems.incrementProgress(model, amount)
       tgt.progress = after
       deltaUsed = after - before
       completed = (after >= tgt.required)
+      if completed then tgt.activated = true end
       newSystems[i] = tgt
     end
   end

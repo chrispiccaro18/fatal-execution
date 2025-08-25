@@ -8,19 +8,6 @@ local Effects = {}
 function Effects.collectActive(model, trigger)
   local out = {}
 
-  -- Systems (activated only)
-  for i, sys in ipairs(model.systems or {}) do
-    if sys.activated and sys.envEffect and sys.envEffect.trigger == trigger then
-      out[#out + 1] = {
-        source = sys.name or sys.id,
-        kind = Const.PLAY_EFFECT_KINDS.SYSTEM,
-        index = i,
-        effect = sys
-            .envEffect
-      }
-    end
-  end
-
   -- Threats (plural)
   for i, th in ipairs(model.threats or {}) do
     if th.envEffect and th.envEffect.trigger == trigger then
@@ -29,6 +16,19 @@ function Effects.collectActive(model, trigger)
         kind = Const.PLAY_EFFECT_KINDS.THREAT,
         index = i,
         effect = th
+            .envEffect
+      }
+    end
+  end
+
+  -- Systems (activated only)
+  for i, sys in ipairs(model.systems or {}) do
+    if sys.activated and sys.envEffect and sys.envEffect.trigger == trigger then
+      out[#out + 1] = {
+        source = sys.name or sys.id,
+        kind = Const.PLAY_EFFECT_KINDS.SYSTEM,
+        index = i,
+        effect = sys
             .envEffect
       }
     end

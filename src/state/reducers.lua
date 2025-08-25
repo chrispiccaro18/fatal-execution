@@ -1,25 +1,28 @@
-local Const            = require("const")
-local immut            = require("util.immut")
-local copy             = require("util.copy")
-local deepcopy         = require("util.deepcopy")
+local Const             = require("const")
+local immut             = require("util.immut")
+local copy              = require("util.copy")
+local deepcopy          = require("util.deepcopy")
+local dump              = require("util.general").dump
 
-local Log              = require("game_state.log")
-local Hand             = require("game_state.hand")
-local Deck             = require("game_state.deck")
-local DestructorDeck   = require("game_state.destructor_deck")
-local Effects          = require("game_state.derived.effects")
-local AnimatingCards   = require("game_state.temp.animating_cards")
+local Log               = require("game_state.log")
+local Hand              = require("game_state.hand")
+local Deck              = require("game_state.deck")
+local DestructorDeck    = require("game_state.destructor_deck")
+local Systems           = require("game_state.systems")
+local Threats           = require("game_state.threats")
+local Effects           = require("game_state.derived.effects")
+local AnimatingCards    = require("game_state.temp.animating_cards")
 
-local TURN_PHASES      = Const.TURN_PHASES
-local ACTIONS          = Const.DISPATCH_ACTIONS
-local TASKS            = Const.TASKS
-local LOG_OPTS         = Const.LOG
-local EFFECTS_TRIGGERS = Const.EFFECTS_TRIGGERS
-local UI_INTENTS       = Const.UI.INTENTS
-local CARD_STATES      = Const.CARD_STATES
+local TURN_PHASES       = Const.TURN_PHASES
+local ACTIONS           = Const.DISPATCH_ACTIONS
+local TASKS             = Const.TASKS
+local LOG_OPTS          = Const.LOG
+local EFFECTS_TRIGGERS  = Const.EFFECTS_TRIGGERS
+local UI_INTENTS        = Const.UI.INTENTS
+local CARD_STATES       = Const.CARD_STATES
 local PLAY_EFFECT_TYPES = Const.PLAY_EFFECT_TYPES
 
-local Reducers         = {}
+local Reducers          = {}
 
 local function findTask(model, taskId)
   if not model.tasks then return nil end
@@ -87,7 +90,7 @@ function Reducers.reduce(model, action)
             opts = {
               category = LOG_OPTS.CATEGORY.EFFECT,
               severity = LOG_OPTS.SEVERITY.INFO,
-              visible  = true, -- show to player; switch to false if you want hidden debug
+              visible  = true,
               data     = { source = note.source, kind = note.kind, index = note.index, tag = note.tag },
             }
           }
@@ -162,13 +165,14 @@ function Reducers.reduce(model, action)
         reflowMap = createReflowMap(model.hand),
       }
     else
-      Log.add(newModel, "Deck empty: couldn't draw a card.", {
+      newModel = Log.add(newModel, "Deck empty: couldn't draw a card.", {
         category = LOG_OPTS.CATEGORY.CARD_DRAW,
         severity = LOG_OPTS.SEVERITY.WARN,
         visible  = true,
       })
       dealTask.remaining = 0
-      dealTask.inProgress = false
+      dealTask.inProgress = true
+      return newModel, uiIntents, newTasks
     end
   end
 
@@ -284,7 +288,7 @@ function Reducers.reduce(model, action)
       })
       -- TODO: emit card shake
 
-    -- check if enough ram available
+      -- check if enough ram available
     elseif newModel.ram >= card.cost then
       newModel.ram = newModel.ram - card.cost
 
@@ -346,22 +350,78 @@ function Reducers.reduce(model, action)
     local playEffectAmountString = playEffectAmount and tostring(playEffectAmount) or "N/A"
 
     if playEffectType == PLAY_EFFECT_TYPES.PROGRESS then
-      print("Progressing by " .. playEffectAmountString .. " by card: " .. playedCard.name)
+      local newSystems, delta, completed = Systems.incrementProgress(newModel.systems, newModel.currentSystemIndex,
+        playEffectAmount)
+      newModel = immut.assign(newModel, "systems", newSystems)
+
+      newModel = Log.add(newModel, "Played " .. playedCard.name .. ": Progress +" .. playEffectAmountString, {
+        category = LOG_OPTS.CATEGORY.CARD_PLAY,
+        severity = LOG_OPTS.SEVERITY.INFO,
+        visible  = true,
+      })
+
+      -- TODO: animate delta
+
+      if completed then
+        local totalSystems = #newModel.systems
+        -- check for win
+        if totalSystems == newModel.currentSystemIndex then
+          local newTurn = immut.assign(newModel.turn, "phase", TURN_PHASES.WON)
+          newModel = immut.assign(newModel, "turn", newTurn)
+          newModel = Log.add(newModel, "=== All systems activated! You win! ===", {
+            category = LOG_OPTS.CATEGORY.END_GAME,
+            severity = LOG_OPTS.SEVERITY.INFO,
+            visible  = true,
+          })
+        else
+          newModel = immut.assign(newModel, "currentSystemIndex", newModel.currentSystemIndex + 1)
+          newModel = Log.add(newModel, "+++ System activated! Moving to " .. newModel.systems[newModel.currentSystemIndex].name .. " +++", {
+            category = LOG_OPTS.CATEGORY.CARD_PLAY,
+            severity = LOG_OPTS.SEVERITY.INFO,
+            visible  = true,
+          })
+          -- TODO: animate system activation
+        end
+      end
     elseif playEffectType == PLAY_EFFECT_TYPES.THREAT then
-      print("Threatening by " .. playEffectAmountString .. " by card: " .. playedCard.name)
+      local newThreats = Threats.increment(newModel.threats, 1, playEffectAmount)
+      newModel = immut.assign(newModel, "threats", newThreats)
+      newModel = Log.add(newModel, "Played " .. playedCard.name .. ": Threat " .. playEffectAmountString, {
+        category = LOG_OPTS.CATEGORY.CARD_PLAY,
+        severity = LOG_OPTS.SEVERITY.INFO,
+        visible  = true,
+      })
+      -- TODO: emit some sort of threat change animation
     elseif playEffectType == PLAY_EFFECT_TYPES.SHUFFLE_DISRUPTOR then
-      print("Shuffling destructor deck by card: " .. playedCard.name .. " " .. playEffectAmountString)
-      -- newModel.deck = Deck.shuffleDisruptor(newModel.deck)
-      -- newModel = Log.add(newModel, "Destructor Deck shuffled.", {
-      --   category = LOG_OPTS.CATEGORY.CARD_PLAY,
-      --   severity = LOG_OPTS.SEVERITY.INFO,
-      --   visible  = true,
-      -- })
+      local newDestructorDeck = DestructorDeck.biasedShuffle(newModel.destructorDeck, newModel.rng.destructor)
+      newModel = immut.assign(newModel, "destructorDeck", newDestructorDeck)
+      newModel = Log.add(newModel, "Played " .. playedCard.name .. ": Shuffled Destructor Deck", {
+        category = LOG_OPTS.CATEGORY.CARD_PLAY,
+        severity = LOG_OPTS.SEVERITY.INFO,
+        visible  = true,
+      })
       -- TODO: emit some sort of destructor deck shuffle animation
     elseif playEffectType == PLAY_EFFECT_TYPES.DRAW then
-      print("Drawing cards by card: " .. playedCard.name .. " " .. playEffectAmountString)
+      newModel = Log.add(newModel, "Played " .. playedCard.name .. ": Drawing " .. playEffectAmountString .. " cards.", {
+        category = LOG_OPTS.CATEGORY.CARD_PLAY,
+        severity = LOG_OPTS.SEVERITY.INFO,
+        visible  = true,
+      })
+
+      local taskId = os.time()
+      newTasks[#newTasks + 1] = {
+        id = taskId,
+        kind = TASKS.DEAL_CARDS,
+        remaining = playEffectAmount,
+        inProgress = false,
+      }
     elseif playEffectType == PLAY_EFFECT_TYPES.NULLIFY_DESTRUCTOR then
-      print("Nullifying destructor effect by card: " .. playedCard.name .. " " .. playEffectAmountString)
+      newModel.destructorNullify = newModel.destructorNullify + (playEffectAmount or 1)
+      newModel = Log.add(newModel, "Played " .. playedCard.name .. ": Nullified Destructor for " .. playEffectAmountString .. " turn.", {
+        category = LOG_OPTS.CATEGORY.CARD_PLAY,
+        severity = LOG_OPTS.SEVERITY.INFO,
+        visible  = true,
+      })
     elseif playEffectType == PLAY_EFFECT_TYPES.NONE then
       print("No effect by card: " .. playedCard.name .. " " .. playEffectAmountString)
     end
@@ -371,6 +431,7 @@ function Reducers.reduce(model, action)
       playedCardInstanceId = playedCardInstanceId,
       taskId = taskId,
     }
+    return newModel, uiIntents, newTasks
   end
 
   if action.type == ACTIONS.PLAYED_CARD_IN_DECK then
@@ -381,7 +442,8 @@ function Reducers.reduce(model, action)
     if playedCard then
       local newDeck = Deck.placeOnBottom(newModel.deck, playedCard)
       newModel = immut.assign(newModel, "deck", newDeck)
-      newModel = immut.assign(newModel, "animatingCards", AnimatingCards.remove(newModel.animatingCards, playedCardInstanceId))
+      newModel = immut.assign(newModel, "animatingCards",
+        AnimatingCards.remove(newModel.animatingCards, playedCardInstanceId))
       playedCard.state = CARD_STATES.IDLE
     end
 

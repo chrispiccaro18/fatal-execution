@@ -1,9 +1,9 @@
-local cfg      = require("ui.cfg")
-local lg       = love.graphics
+local cfg    = require("ui.cfg")
+local lg     = love.graphics
 
-local colors   = cfg.colors
+local colors = cfg.colors
 
-local Card = {}
+local Card   = {}
 
 function Card.drawFace(card, x, y, w, h, pad, hasNullify)
   pad = pad or 6
@@ -59,11 +59,16 @@ function Card.drawFace(card, x, y, w, h, pad, hasNullify)
     lg.printf("Destructor: " .. d.type .. " " .. amount, x + pad, textY + lineH, w - pad * 2, "center")
   end
 
-  lg.setColor(1, 1, 1)
   if hasNullify then
     lg.setColor(colors.yellow)
+    lg.setLineWidth(3)
+    lg.rectangle("line", x, y, w, h)
+    lg.setLineWidth(1)
+    lg.setColor(colors.white)
+  else
+    lg.setColor(colors.white)
+    lg.rectangle("line", x, y, w, h)
   end
-  lg.rectangle("line", x, y, w, h)
 end
 
 return Card
