@@ -10,10 +10,12 @@ local colors           = cfg.colors
 
 local DestructorUI     = {}
 
-function DestructorUI.drawDestructor(panel, destructorDeck, destructorNullify)
-  local pad   = cfgLocal.pad
-  local font  = cfgLocal.font
-  local cardR = DestructorLayout.computeRect(panel)
+function DestructorUI.drawDestructor(view, panel, destructorDeck, destructorNullify)
+  local pad    = cfgLocal.pad
+  local font   = cfgLocal.font
+  local cardR  = DestructorLayout.computeRect(panel)
+  local shuffling = view.destructor.isShuffling
+  local shuffleStartTime = view.destructor.startTime
 
   -- Panel border
   lg.setColor(colors.white)
@@ -21,7 +23,16 @@ function DestructorUI.drawDestructor(panel, destructorDeck, destructorNullify)
 
   local deckSize = #destructorDeck
 
-  if deckSize == 0 then
+  if shuffling then
+    local elapsed = love.timer.getTime() - shuffleStartTime
+    local duration = Const.UI.ANIM.DESTRUCTOR_SHUFFLE_TIME
+    local progress = elapsed / duration
+    -- Use a sine wave that fades out to create the shake
+    local shake = 15 * math.sin(progress * math.pi) * math.sin(elapsed * 20)
+    cardR.x = cardR.x + shake
+    lg.setColor(colors.red)
+    lg.rectangle("fill", cardR.x, cardR.y, cardR.w, cardR.h)
+  elseif deckSize == 0 then
     -- Case 1: No cards, draw a dotted outline at the base position
     lg.setColor(colors.white)
     lg.setLineStyle("rough")

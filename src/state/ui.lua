@@ -472,6 +472,14 @@ function UI.update(view, dt)
     end
   end
 
+  -- Update destructor animation state machine
+  if view.destructor.isShuffling then
+    local elapsed = love.timer.getTime() - view.destructor.startTime
+    if elapsed > ANIMATION_INTERVALS.DESTRUCTOR_SHUFFLE_TIME then
+      view.destructor.isShuffling = false
+    end
+  end
+
   -- Unlock when all animations are done AND no task-based locks remain
   local handAnimEmpty = next(view.handAnimations) == nil
   local lockedTasksEmpty = next(view.lockedTasks) == nil

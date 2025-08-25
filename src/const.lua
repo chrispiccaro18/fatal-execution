@@ -71,7 +71,6 @@ Const.UI                      = {
     PLAY_CARD_PAUSE_THEN_TO_DECK = "play_card_pause_then_to_deck",
   },
   TWEENS = {
-    DESTRUCTOR_SHUFFLE = "destructor_shuffle",
     CARD_FLY = "card_fly",
     CARD_DRAW = "card_draw",
     CARD_REFLOW = "card_reflow",
