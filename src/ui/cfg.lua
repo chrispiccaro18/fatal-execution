@@ -121,6 +121,8 @@ return {
     cardH              = Const.CARD_HEIGHT,
     displayCardOffsetX = -10,
     displayCardOffsetY = -10,
+    shuffleShakeAmount = 15,
+    shuffleShakeFrequency = 20,
   },
 
   endTurnPanel    = {

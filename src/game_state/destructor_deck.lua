@@ -100,4 +100,12 @@ end
 -- (Optional) tiny helper
 function DestructorDeck.size(deck) return #deck end
 
+function DestructorDeck.getInstanceIds(deck)
+  local ids = {}
+  for _, card in ipairs(deck or {}) do
+    ids[#ids + 1] = card.instanceId
+  end
+  return ids
+end
+
 return DestructorDeck

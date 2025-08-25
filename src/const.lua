@@ -56,9 +56,11 @@ Const.UI                      = {
     PLAYED_CARD_TO_CENTER = 0.5,
     PLAYED_CARD_CENTER_PAUSE = 1,
     PLAYED_CARD_FROM_CENTER_TO_DECK = 0.2,
-    POST_DELAY_FRAMES_FOR_CENTER_CARD = 10
+    POST_DELAY_FRAMES_FOR_CENTER_CARD = 10,
+    DESTRUCTOR_SHUFFLE_TIME = 1.2,
   },
   INTENTS = {
+    ANIMATE_DESTRUCTOR_SHUFFLE = "animate_destructor_shuffle",
     ANIMATE_DRAW_DECK_TO_HAND = "animate_draw_deck_to_hand",
     ANIMATE_DISCARD_HAND_TO_DESTRUCTOR = "animate_discard_hand_to_destructor",
     ANIMATE_HAND_REFLOW = "animate_hand_reflow",
@@ -69,6 +71,7 @@ Const.UI                      = {
     PLAY_CARD_PAUSE_THEN_TO_DECK = "play_card_pause_then_to_deck",
   },
   TWEENS = {
+    DESTRUCTOR_SHUFFLE = "destructor_shuffle",
     CARD_FLY = "card_fly",
     CARD_DRAW = "card_draw",
     CARD_REFLOW = "card_reflow",

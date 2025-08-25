@@ -2,6 +2,7 @@ local Const               = require("const")
 local Tween               = require("ui.animations.tween")
 local deepcopy            = require("util.deepcopy")
 local General             = require("util.general")
+local cfg                 = require("ui.cfg")
 
 local ANIMATION_INTERVALS = Const.UI.ANIM
 local INTENTS             = Const.UI.INTENTS
@@ -28,6 +29,7 @@ function UI.init()
     handAnimations       = {}, -- For hand-internal animations (reflow)
     signals              = {},
     lockedTasks          = {},
+    destructor           = { isShuffling = false, startTime = 0 },
     _debug_discard_count = 0,
     _last_hand_rects     = nil,
   }
@@ -200,6 +202,9 @@ function UI.update(view, dt)
         -- Keep instanceId in sync when index is unchanged.
         view.hover.currentInstanceId = uiIntent.cardInstanceId
       end
+    elseif uiIntent.kind == INTENTS.ANIMATE_DESTRUCTOR_SHUFFLE then
+      view.destructor.isShuffling = true
+      view.destructor.startTime = love.timer.getTime()
     elseif uiIntent.kind == INTENTS.ANIMATE_DRAW_DECK_TO_HAND then
       view.inputLocked = true
       local from = view.anchors.getDeckRect()

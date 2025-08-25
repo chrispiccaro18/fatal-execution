@@ -393,6 +393,9 @@ function Reducers.reduce(model, action)
       })
       -- TODO: emit some sort of threat change animation
     elseif playEffectType == PLAY_EFFECT_TYPES.SHUFFLE_DISRUPTOR then
+      -- Capture the IDs BEFORE the shuffle
+      local oldIds = DestructorDeck.getInstanceIds(newModel.destructorDeck)
+
       local newDestructorDeck = DestructorDeck.biasedShuffle(newModel.destructorDeck, newModel.rng.destructor)
       newModel = immut.assign(newModel, "destructorDeck", newDestructorDeck)
       newModel = Log.add(newModel, "Played " .. playedCard.name .. ": Shuffled Destructor Deck", {
@@ -400,7 +403,10 @@ function Reducers.reduce(model, action)
         severity = LOG_OPTS.SEVERITY.INFO,
         visible  = true,
       })
-      -- TODO: emit some sort of destructor deck shuffle animation
+      uiIntents[#uiIntents + 1] = {
+        kind = UI_INTENTS.ANIMATE_DESTRUCTOR_SHUFFLE,
+        cardInstanceIds = oldIds,
+      }
     elseif playEffectType == PLAY_EFFECT_TYPES.DRAW then
       newModel = Log.add(newModel, "Played " .. playedCard.name .. ": Drawing " .. playEffectAmountString .. " cards.", {
         category = LOG_OPTS.CATEGORY.CARD_PLAY,
