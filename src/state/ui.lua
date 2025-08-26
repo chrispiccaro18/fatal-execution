@@ -29,7 +29,7 @@ function UI.init()
     handAnimations       = {}, -- For hand-internal animations (reflow)
     signals              = {},
     lockedTasks          = {},
-    destructor           = { isShuffling = false, startTime = 0 },
+    destructor           = { isShuffling = false, startTime = 0, playInProgress = false },
     _debug_discard_count = 0,
     _last_hand_rects     = nil,
   }
@@ -278,7 +278,6 @@ function UI.update(view, dt)
 
       local from = UI.getCardInHandRect(view, cardIndex)
       local to = view.anchors.getCenterRect()
-
       local onCompletePayload = {
         type = ACTIONS.PLAYED_CARD_IN_CENTER,
         playedCardInstanceId = cardInstanceId,
@@ -328,13 +327,11 @@ function UI.update(view, dt)
 
       local from = view.anchors.getCenterRect()
       local to = view.anchors.getDeckRect()
-
       local onCompletePayload = {
         type = ACTIONS.PLAYED_CARD_IN_DECK,
         playedCardInstanceId = cardInstanceId,
         taskId = taskId
       }
-
       local totalDuration =
         ANIMATION_INTERVALS.PLAYED_CARD_CENTER_PAUSE +
         ANIMATION_INTERVALS.PLAYED_CARD_FROM_CENTER_TO_DECK
@@ -353,7 +350,69 @@ function UI.update(view, dt)
       end
 
       table.insert(view.active, tween)
+    elseif uiIntent.kind == INTENTS.DESTRUCTOR_CARD_TO_CENTER then
+      view.destructor.playInProgress = true
+      local cardInstanceId = uiIntent.cardInstanceId
+      local taskId = uiIntent.taskId
+      local startFromOffset = uiIntent.startFromOffset
 
+      local from = view.anchors.getDestructorRect()
+      if startFromOffset then
+        from.x = from.x + cfg.destructorPanel.displayCardOffsetX
+        from.y = from.y + cfg.destructorPanel.displayCardOffsetY
+      end
+      local to = view.anchors.getCenterRect()
+      local onCompletePayload = {
+        type = ACTIONS.DESTRUCTOR_CARD_IN_CENTER,
+        cardInstanceId = cardInstanceId,
+        taskId = taskId
+      }
+
+      local tween = Tween.new({
+        from = deepcopy(from),
+        to = deepcopy(to),
+        duration = ANIMATION_INTERVALS.DESTRUCTOR_CARD_TO_CENTER,
+        id = cardInstanceId,
+        postDelayFrames = ANIMATION_INTERVALS.POST_DELAY_FRAMES_FOR_CENTER_CARD,
+        tag = TWEENS.DESTRUCTOR_CARD_TO_CENTER,
+      })
+      registerTween(view, tween)
+      tween.onComplete = function()
+        table.insert(view.signals, onCompletePayload)
+      end
+
+      table.insert(view.active, tween)
+
+    elseif uiIntent.kind == INTENTS.DESTRUCTOR_CARD_PAUSE_THEN_TO_DECK then
+      local cardInstanceId = uiIntent.cardInstanceId
+      local taskId = uiIntent.taskId
+
+      local from = view.anchors.getCenterRect()
+      local to = view.anchors.getDeckRect()
+      local onCompletePayload = {
+        type = ACTIONS.END_TURN_FINISH,
+        cardInstanceId = cardInstanceId,
+        taskId = taskId
+      }
+      local totalDuration =
+        ANIMATION_INTERVALS.DESTRUCTOR_CARD_CENTER_PAUSE +
+        ANIMATION_INTERVALS.DESTRUCTOR_CARD_FROM_CENTER_TO_DECK
+
+      local tween = Tween.new({
+        from = deepcopy(from),
+        to = deepcopy(to),
+        delay = ANIMATION_INTERVALS.DESTRUCTOR_CARD_CENTER_PAUSE,
+        duration = totalDuration,
+        id = cardInstanceId,
+        tag = TWEENS.DESTRUCTOR_CARD_PAUSE_THEN_TO_DECK,
+      })
+      registerTween(view, tween)
+      tween.onComplete = function()
+        view.destructor.playInProgress = false
+        table.insert(view.signals, onCompletePayload)
+      end
+
+      table.insert(view.active, tween)
     elseif uiIntent.kind == INTENTS.ANIMATE_HAND_REFLOW then
       view.inputLocked = true
 

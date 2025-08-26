@@ -4,6 +4,7 @@ local copy              = require("util.copy")
 local deepcopy          = require("util.deepcopy")
 local dump              = require("util.general").dump
 
+local TaskIdGen         = require("state.task_id_gen")
 local Log               = require("game_state.log")
 local Hand              = require("game_state.hand")
 local Deck              = require("game_state.deck")
@@ -30,6 +31,17 @@ local function findTask(model, taskId)
     if task.id == taskId then return task end
   end
   return nil
+end
+
+local function deleteTask(tasks, taskId)
+  if not tasks then return tasks end
+  local newTasks = {}
+  for _, task in ipairs(tasks) do
+    if task.id ~= taskId then
+      newTasks[#newTasks + 1] = task
+    end
+  end
+  return newTasks
 end
 
 local function createReflowMap(hand, handIndex)
@@ -64,60 +76,55 @@ function Reducers.reduce(model, action)
   end
 
   if action.type == ACTIONS.BEGIN_TURN then
-    local turn          = copy(newModel.turn)
-    turn.turnCount      = turn.turnCount + 1
-    turn.phase          = TURN_PHASES.IN_PROGRESS
-    newModel.turn       = turn
-    newModel            = Log.add(newModel, "--- Turn " .. turn.turnCount .. " begins ---")
+    local newTurn          = copy(newModel.turn)
+    newTurn.turnCount      = newTurn.turnCount + 1
+    newTurn.phase          = TURN_PHASES.IN_PROGRESS
+    -- newModel.turn       = turn
+    newModel            = immut.assign(newModel, "turn", newTurn)
+    newModel            = Log.add(newModel, "--- Turn " .. newTurn.turnCount .. " begins ---")
 
     newModel.ram        = 0
 
-    local activeEffects = Effects.collectActive(newModel, EFFECTS_TRIGGERS.BEGIN_TURN)
-    if #activeEffects > 0 then
-      local slices = {
-        handSize = newModel.handSize,
-        ram      = newModel.ram,
-        threats  = newModel.threats
-      }
-      local notes = {}
+    -- local activeEffects = Effects.collectActive(newModel, EFFECTS_TRIGGERS.BEGIN_TURN)
+    -- if #activeEffects > 0 then
+    --   local slices = {
+    --     handSize = newModel.handSize,
+    --     ram      = newModel.ram,
+    --     threats  = newModel.threats
+    --   }
+    --   local notes = {}
 
-      for _, ctx in ipairs(activeEffects) do
-        local note = nil
-        slices, note = Effects.applySlices(slices, ctx)
-        if note then
-          notes[#notes + 1] = {
-            entry = note.msg,
-            opts = {
-              category = LOG_OPTS.CATEGORY.EFFECT,
-              severity = LOG_OPTS.SEVERITY.INFO,
-              visible  = true,
-              data     = { source = note.source, kind = note.kind, index = note.index, tag = note.tag },
-            }
-          }
-        end
-      end
+    --   for _, ctx in ipairs(activeEffects) do
+    --     local note = nil
+    --     slices, note = Effects.applySlices(slices, ctx)
+    --     if note then
+    --       notes[#notes + 1] = {
+    --         entry = note.msg,
+    --         opts = {
+    --           category = LOG_OPTS.CATEGORY.EFFECT,
+    --           severity = LOG_OPTS.SEVERITY.INFO,
+    --           visible  = true,
+    --           data     = { source = note.source, kind = note.kind, index = note.index, tag = note.tag },
+    --         }
+    --       }
+    --     end
+    --   end
 
-      if slices.handSize ~= newModel.handSize then
-        newModel = immut.assign(newModel, "handSize", slices.handSize)
-      end
-      if slices.ram ~= newModel.ram then
-        newModel = immut.assign(newModel, "ram", slices.ram)
-      end
-      if slices.threats ~= newModel.threats then
-        newModel = immut.assign(newModel, "threats", slices.threats)
-      end
+    --   newModel = immut.assign(newModel, "handSize", slices.handSize)
+    --   newModel = immut.assign(newModel, "ram", slices.ram)
+    --   newModel = immut.assign(newModel, "threats", slices.threats)
 
-      if #notes > 0 then
-        newModel = Log.addMany(newModel, notes)
-      end
-    end
+    --   if #notes > 0 then
+    --     newModel = Log.addMany(newModel, notes)
+    --   end
+    -- end
 
     local handSize = newModel.handSize
     local have     = #newModel.hand
     local need     = math.max(0, handSize - have)
 
     if need > 0 then
-      local taskId = os.time()
+      local taskId = TaskIdGen.next()
       newTasks[#newTasks + 1] = {
         id         = taskId,
         kind       = TASKS.DEAL_CARDS,
@@ -171,7 +178,7 @@ function Reducers.reduce(model, action)
         visible  = true,
       })
       dealTask.remaining = 0
-      dealTask.inProgress = true
+      dealTask.inProgress = false
       return newModel, uiIntents, newTasks
     end
   end
@@ -236,7 +243,7 @@ function Reducers.reduce(model, action)
     card.state = CARD_STATES.ANIMATING
 
     -- 2. Add to animatingCards
-    local newAnimatingCards = AnimatingCards.add(newModel.animatingCards or AnimatingCards.empty(), card, handIndex) -- handIndex is irrelevant here
+    local newAnimatingCards = AnimatingCards.add(newModel.animatingCards or AnimatingCards.empty(), card, handIndex)
     newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
 
     -- 3. Create UI intents for the two separate animations
@@ -305,7 +312,7 @@ function Reducers.reduce(model, action)
       newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
 
       -- 3. Create task
-      local taskId = os.time()
+      local taskId = TaskIdGen.next()
       newTasks[#newTasks + 1] = {
         id = taskId,
         kind = TASKS.PLAY_CARD,
@@ -351,7 +358,7 @@ function Reducers.reduce(model, action)
 
     if playEffectType == PLAY_EFFECT_TYPES.PROGRESS then
       local newSystems, delta, completed = Systems.incrementProgress(newModel.systems, newModel.currentSystemIndex,
-        playEffectAmount)
+                                                                     playEffectAmount)
       newModel = immut.assign(newModel, "systems", newSystems)
 
       newModel = Log.add(newModel, "Played " .. playedCard.name .. ": Progress +" .. playEffectAmountString, {
@@ -375,11 +382,13 @@ function Reducers.reduce(model, action)
           })
         else
           newModel = immut.assign(newModel, "currentSystemIndex", newModel.currentSystemIndex + 1)
-          newModel = Log.add(newModel, "+++ System activated! Moving to " .. newModel.systems[newModel.currentSystemIndex].name .. " +++", {
-            category = LOG_OPTS.CATEGORY.CARD_PLAY,
-            severity = LOG_OPTS.SEVERITY.INFO,
-            visible  = true,
-          })
+          newModel = Log.add(newModel,
+                             "+++ System activated! Moving to " ..
+                             newModel.systems[newModel.currentSystemIndex].name .. " +++", {
+                               category = LOG_OPTS.CATEGORY.CARD_PLAY,
+                               severity = LOG_OPTS.SEVERITY.INFO,
+                               visible  = true,
+                             })
           -- TODO: animate system activation
         end
       end
@@ -414,7 +423,7 @@ function Reducers.reduce(model, action)
         visible  = true,
       })
 
-      local taskId = os.time()
+      local taskId = TaskIdGen.next()
       newTasks[#newTasks + 1] = {
         id = taskId,
         kind = TASKS.DEAL_CARDS,
@@ -423,11 +432,13 @@ function Reducers.reduce(model, action)
       }
     elseif playEffectType == PLAY_EFFECT_TYPES.NULLIFY_DESTRUCTOR then
       newModel.destructorNullify = newModel.destructorNullify + (playEffectAmount or 1)
-      newModel = Log.add(newModel, "Played " .. playedCard.name .. ": Nullified Destructor for " .. playEffectAmountString .. " turn.", {
-        category = LOG_OPTS.CATEGORY.CARD_PLAY,
-        severity = LOG_OPTS.SEVERITY.INFO,
-        visible  = true,
-      })
+      newModel = Log.add(newModel,
+                         "Played " ..
+                         playedCard.name .. ": Nullified Destructor for " .. playEffectAmountString .. " turn.", {
+                           category = LOG_OPTS.CATEGORY.CARD_PLAY,
+                           severity = LOG_OPTS.SEVERITY.INFO,
+                           visible  = true,
+                         })
     elseif playEffectType == PLAY_EFFECT_TYPES.NONE then
       print("No effect by card: " .. playedCard.name .. " " .. playEffectAmountString)
     end
@@ -449,7 +460,7 @@ function Reducers.reduce(model, action)
       local newDeck = Deck.placeOnBottom(newModel.deck, playedCard)
       newModel = immut.assign(newModel, "deck", newDeck)
       newModel = immut.assign(newModel, "animatingCards",
-        AnimatingCards.remove(newModel.animatingCards, playedCardInstanceId))
+                              AnimatingCards.remove(newModel.animatingCards, playedCardInstanceId))
       playedCard.state = CARD_STATES.IDLE
     end
 
@@ -458,6 +469,209 @@ function Reducers.reduce(model, action)
       task.complete = true
       task.inProgress = false
     end
+  end
+
+  if action.type == ACTIONS.END_TURN_CLICKED then
+    -- change phase
+    local turn = copy(newModel.turn)
+    turn.phase = TURN_PHASES.END_TURN
+    newModel = immut.assign(newModel, "turn", turn)
+    -- enqueue top destructor card
+    local destructorCard, newDestructorDeck = DestructorDeck.draw(newModel.destructorDeck)
+    -- if no card, add log and skip to destructor finished stage
+    if not destructorCard then
+      newModel = Log.add(newModel, "No card drawn from Destructor Deck :)", {
+        category = LOG_OPTS.CATEGORY.DESTRUCTOR,
+        severity = LOG_OPTS.SEVERITY.INFO,
+        visible  = true,
+      })
+      -- resolve end of turn effects
+      -- local activeEffects = Effects.collectActive(newModel, EFFECTS_TRIGGERS.END_OF_TURN)
+      -- if #activeEffects > 0 then
+      --   local slices = {
+      --     handSize = newModel.handSize,
+      --     ram      = newModel.ram,
+      --     threats  = newModel.threats
+      --   }
+      --   local notes = {}
+
+      --   for _, ctx in ipairs(activeEffects) do
+      --     local note = nil
+      --     slices, note = Effects.applySlices(slices, ctx)
+      --     if note then
+      --       notes[#notes + 1] = {
+      --         entry = note.msg,
+      --         opts = {
+      --           category = LOG_OPTS.CATEGORY.EFFECT,
+      --           severity = LOG_OPTS.SEVERITY.INFO,
+      --           visible  = true,
+      --           data     = { source = note.source, kind = note.kind, index = note.index, tag = note.tag },
+      --         }
+      --       }
+      --     end
+      --   end
+
+      --   newModel = immut.assign(newModel, "handSize", slices.handSize)
+      --   newModel = immut.assign(newModel, "ram", slices.ram)
+      --   newModel = immut.assign(newModel, "threats", slices.threats)
+
+      --   if #notes > 0 then
+      --     newModel = Log.addMany(newModel, notes)
+      --   end
+      -- end
+      -- check for loss condition
+      if Threats.anyExceeded(newModel.threats) then
+        local newTurn = immut.assign(newModel.turn, "phase", TURN_PHASES.LOST)
+        newModel = immut.assign(newModel, "turn", newTurn)
+        newModel = Log.add(newModel, "=== Threat level exceeded! You lose! ===", {
+          category = LOG_OPTS.CATEGORY.END_GAME,
+          severity = LOG_OPTS.SEVERITY.INFO,
+          visible  = true,
+        })
+      end
+
+      -- start next turn
+      return Reducers.reduce(newModel, { type = ACTIONS.BEGIN_TURN })
+      -- return newModel, uiIntents, newTasks
+    else
+      destructorCard.selectable = false
+      destructorCard.state = CARD_STATES.ANIMATING
+
+      local startFromOffset = #newModel.destructorDeck > 1
+
+      newModel = immut.assign(newModel, "destructorDeck", newDestructorDeck)
+      local newAnimatingCards = AnimatingCards.add(newModel.animatingCards or AnimatingCards.empty(), destructorCard, 18)
+      newModel = immut.assign(newModel, "animatingCards", newAnimatingCards)
+
+      local taskId = TaskIdGen.next()
+      newTasks[#newTasks + 1] = {
+        id = taskId,
+        kind = TASKS.DESTRUCTOR_PLAY,
+        cardInstanceId = destructorCard.instanceId,
+        inProgress = false,
+        complete = false,
+      }
+
+      uiIntents[#uiIntents + 1] = {
+        kind = UI_INTENTS.DESTRUCTOR_CARD_TO_CENTER,
+        cardInstanceId = destructorCard.instanceId,
+        startFromOffset = startFromOffset,
+        taskId = taskId,
+      }
+    end
+  end
+
+  if action.type == ACTIONS.DESTRUCTOR_CARD_IN_CENTER then
+    local destructorCardInstanceId = action.cardInstanceId
+    local taskId = action.taskId
+
+    -- check if nullify is active
+    if newModel.destructorNullify > 0 then
+      -- TODO: emit center card shake
+      newModel.destructorNullify = newModel.destructorNullify - 1
+      -- TODO: send to bottom of deck
+    else
+      local destructorCard = AnimatingCards.get(newModel.animatingCards, destructorCardInstanceId)
+      local destructorEffectType = destructorCard.destructorEffect and destructorCard.destructorEffect.type or nil
+      local destructorEffectAmount = destructorCard.destructorEffect and destructorCard.destructorEffect.amount or nil
+      local destructorAmountString = destructorEffectAmount and tostring(destructorEffectAmount) or "N/A"
+
+      -- update state with the destructor card's effect
+      if destructorEffectType == Const.DESTRUCTOR_EFFECT_TYPES.PROGRESS then
+      elseif destructorEffectType == Const.DESTRUCTOR_EFFECT_TYPES.THREAT then
+        print("[DESTRUCTOR_CARD_IN_CENTER] Destructor threat +" .. destructorAmountString)
+      elseif destructorEffectType == Const.DESTRUCTOR_EFFECT_TYPES.DRAW_TO_DESTRUCTOR then
+        print("[DESTRUCTOR_CARD_IN_CENTER] Destructor draw to destructor +" .. destructorAmountString)
+      elseif destructorEffectType == Const.DESTRUCTOR_EFFECT_TYPES.THREAT_MULTIPLIER then
+        print("[DESTRUCTOR_CARD_IN_CENTER] Destructor threat multiplier +" .. destructorAmountString)
+      elseif destructorEffectType == Const.DESTRUCTOR_EFFECT_TYPES.NONE then
+        print("[DESTRUCTOR_CARD_IN_CENTER] Destructor no effect")
+      end
+
+      uiIntents[#uiIntents + 1] = {
+        kind = UI_INTENTS.DESTRUCTOR_CARD_PAUSE_THEN_TO_DECK,
+        cardInstanceId = destructorCard.instanceId,
+        taskId = taskId,
+      }
+
+      -- if threats was updated, check for loss condition
+      if Threats.anyExceeded(newModel.threats) then
+        local newTurn = immut.assign(newModel.turn, "phase", TURN_PHASES.LOST)
+        newModel = immut.assign(newModel, "turn", newTurn)
+        newModel = Log.add(newModel, "=== Threat level exceeded! You lose! ===", {
+          category = LOG_OPTS.CATEGORY.END_GAME,
+          severity = LOG_OPTS.SEVERITY.INFO,
+          visible  = true,
+        })
+      end
+    end
+  end
+
+  if action.type == ACTIONS.END_TURN_FINISH then
+    local cardInstanceId = action.cardInstanceId
+    local taskId = action.taskId
+    local card = AnimatingCards.get(newModel.animatingCards, cardInstanceId)
+    -- if card add it to bottom of deck
+    if card then
+      local newDeck = Deck.placeOnBottom(newModel.deck, card)
+      newModel = immut.assign(newModel, "deck", newDeck)
+      newModel = immut.assign(newModel, "animatingCards",
+                              AnimatingCards.empty())
+      card.state = CARD_STATES.IDLE
+    end
+
+    -- resolve end of turn effects
+    -- local activeEffects = Effects.collectActive(newModel, EFFECTS_TRIGGERS.END_OF_TURN)
+    -- if #activeEffects > 0 then
+    --   local slices = {
+    --     handSize = newModel.handSize,
+    --     ram      = newModel.ram,
+    --     threats  = newModel.threats
+    --   }
+    --   local notes = {}
+
+    --   for _, ctx in ipairs(activeEffects) do
+    --     local note = nil
+    --     slices, note = Effects.applySlices(slices, ctx)
+    --     if note then
+    --       notes[#notes + 1] = {
+    --         entry = note.msg,
+    --         opts = {
+    --           category = LOG_OPTS.CATEGORY.EFFECT,
+    --           severity = LOG_OPTS.SEVERITY.INFO,
+    --           visible  = true,
+    --           data     = { source = note.source, kind = note.kind, index = note.index, tag = note.tag },
+    --         }
+    --       }
+    --     end
+    --   end
+
+    --   newModel = immut.assign(newModel, "handSize", slices.handSize)
+    --   newModel = immut.assign(newModel, "ram", slices.ram)
+    --   newModel = immut.assign(newModel, "threats", slices.threats)
+
+    --   if #notes > 0 then
+    --     newModel = Log.addMany(newModel, notes)
+    --   end
+    -- end
+    -- check for loss condition
+    if Threats.anyExceeded(newModel.threats) then
+      local newTurn = immut.assign(newModel.turn, "phase", TURN_PHASES.LOST)
+      newModel = immut.assign(newModel, "turn", newTurn)
+      newModel = Log.add(newModel, "=== Threat level exceeded! You lose! ===", {
+        category = LOG_OPTS.CATEGORY.END_GAME,
+        severity = LOG_OPTS.SEVERITY.INFO,
+        visible  = true,
+      })
+    end
+
+    local task = findTask(newModel, taskId)
+    if task then
+      task.complete = true
+      task.inProgress = false
+    end
+    -- start next turn
+    return Reducers.reduce(newModel, { type = ACTIONS.BEGIN_TURN })
   end
 
   if action.type == ACTIONS.TASK_IN_PROGRESS then

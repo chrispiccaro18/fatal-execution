@@ -53,7 +53,12 @@ function Store.update(dt)
   end
 
   local producedActions, uiIntents = TaskRunner.step(Store.model, Store.view, dt)
-  for _, action in ipairs(producedActions) do Store.dispatch(action) end
+  if #producedActions > 0 then
+    for _, action in ipairs(producedActions) do
+      Store.dispatch(action)
+    end
+  end
+
   if uiIntents and #uiIntents > 0 then UI.schedule(Store.view, uiIntents) end
 
   UI.update(Store.view, dt)

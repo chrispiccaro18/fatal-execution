@@ -19,8 +19,12 @@ function TaskRunner.step(model, view, dt)
   local tasks = model.tasks
   if not tasks or #tasks == 0 then return produced, ui end
 
-  for i = #tasks, 1, -1 do
+  local remainingTasks = {}
+
+  for i = 1, #tasks do
     local task = tasks[i]
+    local remove = false
+
     if task.inProgress then
       if task.kind == TASKS.DEAL_CARDS and task.remaining <= 0 then
         task.inProgress = false
@@ -34,12 +38,22 @@ function TaskRunner.step(model, view, dt)
           produced[#produced + 1] = { type = ACTIONS.DRAW_CARD, taskId = task.id }
         elseif task.remaining <= 0 then
           ui[#ui + 1] = { kind = UI_INTENTS.UNLOCK_UI_FOR_TASK, taskId = task.id }
-          table.remove(model.tasks, i)
+          remove = true
         end
       elseif task.kind == TASKS.PLAY_CARD then
         if task.complete then
           ui[#ui + 1] = { kind = UI_INTENTS.UNLOCK_UI_FOR_TASK, taskId = task.id }
-          table.remove(model.tasks, i)
+          remove = true
+        else
+          produced[#produced + 1] = { type = ACTIONS.TASK_IN_PROGRESS, taskId = task.id }
+          if view and view.lockedTasks and not view.lockedTasks[task.id] then
+            ui[#ui + 1] = { kind = UI_INTENTS.LOCK_UI_FOR_TASK, taskId = task.id }
+          end
+        end
+      elseif task.kind == TASKS.DESTRUCTOR_PLAY then
+        if task.complete then
+          ui[#ui + 1] = { kind = UI_INTENTS.UNLOCK_UI_FOR_TASK, taskId = task.id }
+          remove = true
         else
           produced[#produced + 1] = { type = ACTIONS.TASK_IN_PROGRESS, taskId = task.id }
           if view and view.lockedTasks and not view.lockedTasks[task.id] then
@@ -62,10 +76,16 @@ function TaskRunner.step(model, view, dt)
           entry    = ("Discarded unknown task kind: %s"):format(tostring(task.kind)),
         }
         -- → discard to avoid stalling the queue
-        table.remove(model.tasks, i)
+        remove = true
       end
     end
+
+    if not remove then
+      remainingTasks[#remainingTasks + 1] = task
+    end
   end
+
+  model.tasks = remainingTasks
 
   return produced, ui
 end

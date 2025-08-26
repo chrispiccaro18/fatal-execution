@@ -34,7 +34,9 @@ Const.DISPATCH_ACTIONS        = {
   PLAY_CARD = "play_card",
   PLAYED_CARD_IN_CENTER = "played_card_in_center",
   PLAYED_CARD_IN_DECK = "played_card_in_deck",
-  END_TURN = "end_turn",
+  END_TURN_CLICKED = "end_turn_clicked",
+  DESTRUCTOR_CARD_IN_CENTER = "destructor_card_in_center",
+  END_TURN_FINISH = "end_turn_finish",
   LOG_DEBUG  = "log_debug",
   TASK_IN_PROGRESS = "task_in_progress",
 }
@@ -43,6 +45,7 @@ Const.TASKS                = {
   DEAL_CARDS = "deal_cards",
   DISCARD_CARD = "discard_card",
   PLAY_CARD = "play_card",
+  DESTRUCTOR_PLAY = "destructor_play",
 }
 
 Const.UI                      = {
@@ -58,6 +61,9 @@ Const.UI                      = {
     PLAYED_CARD_FROM_CENTER_TO_DECK = 0.2,
     POST_DELAY_FRAMES_FOR_CENTER_CARD = 10,
     DESTRUCTOR_SHUFFLE_TIME = 1.2,
+    DESTRUCTOR_CARD_TO_CENTER = 1,
+    DESTRUCTOR_CARD_CENTER_PAUSE = 1.5,
+    DESTRUCTOR_CARD_FROM_CENTER_TO_DECK = 0.5,
   },
   INTENTS = {
     ANIMATE_DESTRUCTOR_SHUFFLE = "animate_destructor_shuffle",
@@ -69,6 +75,8 @@ Const.UI                      = {
     UNLOCK_UI_FOR_TASK = "unlock_ui_for_task",
     PLAY_CARD_TO_CENTER = "play_card_to_center",
     PLAY_CARD_PAUSE_THEN_TO_DECK = "play_card_pause_then_to_deck",
+    DESTRUCTOR_CARD_TO_CENTER = "destructor_card_to_center",
+    DESTRUCTOR_CARD_PAUSE_THEN_TO_DECK = "destructor_card_pause_then_to_deck",
   },
   TWEENS = {
     CARD_FLY = "card_fly",
@@ -287,6 +295,7 @@ Const.LOG                     =
     CARD_DRAW = "card_draw",
     CARD_DISCARD = "card_discard",
     CARD_PLAY = "card_play",
+    DESTRUCTOR = "destructor",
     EFFECT = "effect"
   }
 }

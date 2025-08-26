@@ -96,7 +96,7 @@ function GameLoop.mousepressed(x, y, button)
 
   if button == 1 then
     if hit.id == Const.END_TURN_BUTTON.ID then
-      Store.dispatch({ type = ACTIONS.END_TURN })
+      Store.dispatch({ type = ACTIONS.END_TURN_CLICKED })
     elseif hit.id == Const.HIT_IDS.CARD then
       Store.dispatch({ type = ACTIONS.PLAY_CARD, idx = hit.payload.handIndex })
     end

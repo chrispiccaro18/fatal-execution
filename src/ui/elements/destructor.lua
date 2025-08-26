@@ -16,6 +16,7 @@ function DestructorUI.drawDestructor(view, panel, destructorDeck, destructorNull
   local cardR  = DestructorLayout.computeRect(panel)
   local shuffling = view.destructor.isShuffling
   local shuffleStartTime = view.destructor.startTime
+  local playInProgress = view.destructor.playInProgress
 
   -- Panel border
   lg.setColor(colors.white)
